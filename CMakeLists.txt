@@ -30,7 +30,10 @@ include(pico_sdk_import.cmake)
 project(FLIGHT C CXX ASM)
 
 pico_sdk_init()
-add_executable(FLIGHT main.cpp 
+add_executable(FLIGHT main.cpp
+    app/core0.cpp
+    app/core1.cpp
+    sdcard/sd_driver.cpp
     storage/storage_impl.cpp
     http/servers/dns_server.cpp
     http/servers/dhcp_server.cpp
@@ -89,6 +92,7 @@ target_link_libraries(FLIGHT
 # Add the standard include files to the build
 target_include_directories(FLIGHT PRIVATE
         ${CMAKE_CURRENT_LIST_DIR}
+        ${CMAKE_CURRENT_LIST_DIR}/app
         ${CMAKE_CURRENT_LIST_DIR}/i2c
         ${CMAKE_CURRENT_LIST_DIR}/sdcard
         ${CMAKE_CURRENT_LIST_DIR}/storage

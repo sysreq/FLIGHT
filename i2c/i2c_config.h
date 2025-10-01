@@ -14,6 +14,7 @@
 #include <type_traits>
 
 #include <hardware\i2c.h>
+#include <hardware\gpio.h>
 
 namespace i2c {
 

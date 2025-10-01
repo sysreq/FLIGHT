@@ -14,6 +14,10 @@ private:
     static inline size_t device_count = 0;
     static inline bool initialized = false;
     static inline bool enabled = false;
+
+    static constexpr uint32_t SDA_PIN = SDA;
+    static constexpr uint32_t SCL_PIN = SCL;
+    static constexpr uint32_t BUS_BAUDRATE = Baudrate;
     
     // Static storage for device instances
     template<Device DeviceType>
@@ -78,10 +82,10 @@ public:
         i2c_init(Instance, Baudrate);
         
         // Configure GPIO pins
-        gpio_set_function(SDA, GPIO_FUNC_I2C);
-        gpio_set_function(SCL, GPIO_FUNC_I2C);
-        gpio_pull_up(SDA);
-        gpio_pull_up(SCL);
+        gpio_set_function(SDA_PIN, GPIO_FUNC_I2C);
+        gpio_set_function(SCL_PIN, GPIO_FUNC_I2C);
+        gpio_pull_up(SDA_PIN);
+        gpio_pull_up(SCL_PIN);
 
         // Initialize tracking arrays
         registered_addresses.fill(0xFF);
@@ -91,7 +95,7 @@ public:
         
         initialized = true;
         printf("I2C Bus: Initialized on pins SDA=%u, SCL=%u at %u Hz\n", 
-               SDA, SCL, Baudrate);
+               SDA_PIN, SCL, Baudrate);
 
         bus_scan();
         return true;

@@ -69,15 +69,15 @@ public:
 } // namespace sdcard
 
 // ============================================
-// C INTERFACE IMPLEMENTATION
+// C INTERFACE
 // ============================================
+#ifdef __cplusplus
 extern "C" {
-    size_t sd_get_num() { 
-        return sdcard::SDDriver::IsReady() ? 1 : 0;
-    }
-    
-    sd_card_t* sd_get_by_num(size_t num) {
-        if (num != 0) return nullptr;
-        return sdcard::SDDriver::GetCard();
-    }
+#endif
+
+size_t sd_get_num();
+sd_card_t* sd_get_by_num(size_t num);
+
+#ifdef __cplusplus
 }
+#endif
