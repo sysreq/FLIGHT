@@ -1,28 +1,29 @@
 #include "http_server.h"
+#include "../http_platform.h"
 
 extern "C" {
 static err_t tcp_server_accept_callback(void* arg, struct tcp_pcb* client_pcb, err_t err) {
-    auto* server = static_cast<http::servers::HttpServer*>(arg);
+    auto* server = static_cast<http::core::HttpServer*>(arg);
     return server->handle_accept(client_pcb, err);
 }
 
 static err_t tcp_server_recv_callback(void* arg, struct tcp_pcb* pcb, struct pbuf* p, err_t err) {
-    auto* conn = static_cast<http::servers::HttpServer::Connection*>(arg);
+    auto* conn = static_cast<http::core::HttpServer::Connection*>(arg);
     return conn->server->handle_recv(pcb, p, err, conn);
 }
 
 static err_t tcp_server_sent_callback(void* arg, struct tcp_pcb* pcb, u16_t len) {
-    auto* conn = static_cast<http::servers::HttpServer::Connection*>(arg);
+    auto* conn = static_cast<http::core::HttpServer::Connection*>(arg);
     return conn->server->handle_sent(pcb, len, conn);
 }
 
 static void tcp_server_err_callback(void* arg, err_t err) {
-    auto* conn = static_cast<http::servers::HttpServer::Connection*>(arg);
+    auto* conn = static_cast<http::core::HttpServer::Connection*>(arg);
     conn->server->handle_error(err, conn);
 }
 } // extern "C"
 
-namespace http::servers {
+namespace http::core {
 
 HttpServer::~HttpServer() {
     stop();
@@ -214,4 +215,4 @@ err_t HttpServer::close_connection(HttpServer::Connection* conn, struct tcp_pcb*
     return close_err;
 }
 
-} // namespace http::servers
+} // namespace http::core

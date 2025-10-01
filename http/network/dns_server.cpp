@@ -1,14 +1,17 @@
 #include "dns_server.h"
+#include "../http_platform.h"
 
-extern "C" void dns_server_process_callback(void* arg, struct udp_pcb* upcb, struct pbuf* p, 
+extern "C" void dns_server_process_callback(void* arg, struct udp_pcb* upcb, struct pbuf* p,
                                            const ip_addr_t* src_addr, u16_t src_port) {
-    auto* server = static_cast<http::servers::DnsServer*>(arg);
+    auto* server = static_cast<http::network::DnsServer*>(arg);
     server->process_request(p, src_addr, src_port);
 }
 namespace {
 
-constexpr uint16_t PORT_DNS_SERVER = 53;
-constexpr size_t MAX_DNS_MSG_SIZE = 300;
+// Use config constants instead of duplicating them
+using config::dns::SERVER_PORT;
+using config::dns::MAX_MESSAGE_SIZE;
+using config::dns::DEFAULT_TTL_SECONDS;
 
 struct dns_header_t {
     uint16_t id;
@@ -46,7 +49,7 @@ static int dns_socket_sendto(struct udp_pcb* udp, const void* buf, size_t len,
 
 } // anonymous namespace
 
-namespace http::servers {
+namespace http::network {
 
 DnsServer::~DnsServer() {
     stop();
@@ -64,16 +67,16 @@ bool DnsServer::start(const ip_addr_t* ip) {
 
     udp_recv(udp_, ::dns_server_process_callback, this);
 
-    err_t err = udp_bind(udp_, IP_ANY_TYPE, PORT_DNS_SERVER);
+    err_t err = udp_bind(udp_, IP_ANY_TYPE, SERVER_PORT);
     if (err != ERR_OK) {
-        printf("DNS server failed to bind to port %u: %d\n", PORT_DNS_SERVER, err);
+        printf("DNS server failed to bind to port %u: %d\n", SERVER_PORT, err);
         udp_remove(udp_);
         udp_ = nullptr;
         return false;
     }
 
     ip_addr_copy(ip_, *ip);
-    printf("DNS server listening on port %d\n", PORT_DNS_SERVER);
+    printf("DNS server listening on port %d\n", SERVER_PORT);
     return true;
 }
 
@@ -91,7 +94,7 @@ void DnsServer::process_request(struct ::pbuf* p, const ip_addr_t* src_addr, u16
         ~PbufGuard() { if (p) pbuf_free(p); }
     } pbuf_guard{p};
 
-    uint8_t dns_msg[MAX_DNS_MSG_SIZE];
+    uint8_t dns_msg[MAX_MESSAGE_SIZE];
     dns_header_t* dns_hdr = reinterpret_cast<dns_header_t*>(dns_msg);
 
     size_t msg_len = pbuf_copy_partial(p, dns_msg, sizeof(dns_msg), 0);
@@ -175,4 +178,4 @@ void DnsServer::process_request(struct ::pbuf* p, const ip_addr_t* src_addr, u16
     dns_socket_sendto(udp_, dns_msg, answer_ptr - dns_msg, src_addr, src_port);
 }
 
-} // namespace http::servers
+} // namespace http::network

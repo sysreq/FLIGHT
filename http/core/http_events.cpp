@@ -1,6 +1,10 @@
 #include "http_events.h"
+#include "../http_platform.h"
+#include "http_utils.h"
+#include <cstring>
+#include <cstdio>
 
-namespace http::servers {
+namespace http::core {
 
 HttpEventHandler::HttpEventHandler() {}
 
@@ -19,58 +23,60 @@ void HttpEventHandler::initialize() {
 
 Event HttpEventHandler::parse_event(const char* request) const {
     Event event;
-    
+
     // Find the event parameter in the query string
     const char* query = std::strchr(request, '?');
     if (!query) return event;
-    
+
     // Look for "e=" parameter (short for event)
     const char* e_param = std::strstr(query, "e=");
     if (!e_param) return event;
-    
+
     e_param += 2; // Skip "e="
-    
+
     // Extract event name (up to & or space)
-    char name_buf[64] = {0};
+    char name_buf[constants::NAME_BUFFER_SIZE] = {0};
     const char* end = std::strpbrk(e_param, "& \r\n");
     size_t name_len = end ? (end - e_param) : std::strlen(e_param);
     if (name_len > sizeof(name_buf) - 1) {
         name_len = sizeof(name_buf) - 1;
     }
     std::memcpy(name_buf, e_param, name_len);
-    event.name = name_buf;
-    
+
+    // Convert string to EventType
+    event.type = event_type_from_string(name_buf);
+
     // Parse optional parameters: v1, v2, f
     const char* v1 = std::strstr(query, "&v1=");
     if (v1) event.value1 = std::atoi(v1 + 4);
-    
+
     const char* v2 = std::strstr(query, "&v2=");
     if (v2) event.value2 = std::atoi(v2 + 4);
-    
+
     const char* f = std::strstr(query, "&f=");
     if (f) event.fvalue = std::atof(f + 3);
-    
+
     return event;
 }
 
 bool HttpEventHandler::process_request(const char* request, size_t len) {
     if (!initialized_) return false;
-    
+
     Event event = parse_event(request);
-    if (event.name.empty()) return false;
-    
+    if (event.type == EventType::None) return false;
+
     critical_section_enter_blocking(&mutex_);
-    
+
     bool queued = false;
     if (event_queue_.size() < MAX_QUEUE_SIZE) {
         event_queue_.push(event);
         queued = true;
-        printf("EVENT: Queued '%s' (v1=%d, v2=%d, f=%.2f)\n", 
-               event.name.c_str(), event.value1, event.value2, event.fvalue);
+        printf("EVENT: Queued '%s' (v1=%d, v2=%d, f=%.2f)\n",
+               event_type_to_string(event.type), event.value1, event.value2, event.fvalue);
     } else {
-        printf("EVENT: Queue full, dropped '%s'\n", event.name.c_str());
+        printf("EVENT: Queue full, dropped '%s'\n", event_type_to_string(event.type));
     }
-    
+
     critical_section_exit(&mutex_);
     return queued;
 }
@@ -119,4 +125,4 @@ void HttpEventHandler::clear() {
     critical_section_exit(&mutex_);
 }
 
-} // namespace http::servers
+} // namespace http::core

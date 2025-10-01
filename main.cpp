@@ -3,6 +3,7 @@
 #include "pico\stdlib.h"
 #include "pico\stdio.h"
 #include "pico\multicore.h"
+#include "pico\cyw43_arch.h"
 
 #include "common\channels.h"
 
@@ -281,19 +282,19 @@ int main3() {
         sleep_ms(50);
         #endif
         
-        http::servers::Event event;
+        http::core::Event event;
         if (access_point.event_handler().pop_event(event)) {
-            if (event.name == "start" || event.name == "stop") {
+            if (event.type == http::core::EventType::TimerStart || event.type == http::core::EventType::TimerStop) {
                 static constexpr int ARIZONA_OFFSET_SECONDS = -7 * 3600;  // UTC-7
                 uint32_t client_unix_time = event.value1 + ARIZONA_OFFSET_SECONDS;
                 char time_str[32];
-                
+
                 unix_to_string(client_unix_time, time_str, sizeof(time_str));
-    
-                printf("Event: %s at client time: %s.%03d\n", event.name.c_str(), time_str, event.value2);
+
+                printf("Event: %s at client time: %s.%03d\n", http::core::event_type_to_string(event.type), time_str, event.value2);
             } else {
-                printf("Event '%s' at %lu ms (v1=%d, v2=%d, f=%.2f)\n", 
-                    event.name.c_str(), 
+                printf("Event '%s' at %lu ms (v1=%d, v2=%d, f=%.2f)\n",
+                    http::core::event_type_to_string(event.type),
                     (unsigned long)event.timestamp,
                     event.value1, event.value2, event.fvalue);
             }
@@ -359,7 +360,7 @@ int main() {
         if (now - last_loadcell > 20'000 && loadcell.update()) {
             auto data = loadcell.get_data();
             SDFile<HX711DataLog>::Write("Load: %.2f | Tared: %d | Raw: %d\n | Time: %d", data.weight, data.tared_value, data.raw_value, now/1000);
-            http::servers::HttpGenerator::force = data.weight; 
+            access_point.telemetry_handler().force = data.weight; 
             last_loadcell = now;
         }
 
@@ -373,7 +374,7 @@ int main() {
                         const auto* bmp_data = msg->As<bmp581_data>();
                         SDFile<TelemetryFile>::Write("BMP581: Temp=%.2f°C, Pressure=%.1f Pa, Altitude=%.1f m\n",
                         bmp_data->temperature, bmp_data->pressure, bmp_data->altitude);
-                        http::servers::HttpGenerator::altitude = bmp_data->altitude;   // Altitude value  
+                        access_point.telemetry_handler().altitude = bmp_data->altitude;   // Altitude value  
                         break; }
                     case MSG_MS4525_DATA: {
                         const auto* ms4525_data = msg->As<ms4525d0_data>();
@@ -404,31 +405,33 @@ int main() {
         sleep_ms(50);
         #endif
         
-        http::servers::Event event;
+        http::core::Event event;
         if (access_point.event_handler().pop_event(event)) {
-            if (event.name == "start") {
+            if (event.type == http::core::EventType::TimerStart) {
                 static constexpr int ARIZONA_OFFSET_SECONDS = -7 * 3600;  // UTC-7
                 uint32_t client_unix_time = event.value1 + ARIZONA_OFFSET_SECONDS;
                 char time_str[32];
-                
-                unix_to_string(client_unix_time, time_str, sizeof(time_str));
-    
-                SDFile<TelemetryFile>::Write("Started: %s at client time: %s.%03d\n", event.name.c_str(), time_str, event.value2);
-                SDFile<HX711DataLog>::Write("Started: %s at client time: %s.%03d\n", event.name.c_str(), time_str, event.value2);
-                SDFile<SpeedFile>::Write("Started: %s at client time: %s.%03d\n", event.name.c_str(), time_str, event.value2);
-                printf("Started: %s at client time: %s.%03d\n", event.name.c_str(), time_str, event.value2);
-                multicore_launch_core1(core1_entry);
-            } else if (event.name == "stop") {
-                static constexpr int ARIZONA_OFFSET_SECONDS = -7 * 3600;  // UTC-7
-                uint32_t client_unix_time = event.value1 + ARIZONA_OFFSET_SECONDS;
-                char time_str[32];
-                
+
                 unix_to_string(client_unix_time, time_str, sizeof(time_str));
 
-                SDFile<TelemetryFile>::Write("Stopped: %s at client time: %s.%03d\n", event.name.c_str(), time_str, event.value2);
-                SDFile<HX711DataLog>::Write("Stopped: %s at client time: %s.%03d\n", event.name.c_str(), time_str, event.value2);
-                SDFile<SpeedFile>::Write("Stopped: %s at client time: %s.%03d\n", event.name.c_str(), time_str, event.value2);
-                printf("Stopped: %s at client time: %s.%03d\n", event.name.c_str(), time_str, event.value2);
+                const char* event_name = http::core::event_type_to_string(event.type);
+                SDFile<TelemetryFile>::Write("Started: %s at client time: %s.%03d\n", event_name, time_str, event.value2);
+                SDFile<HX711DataLog>::Write("Started: %s at client time: %s.%03d\n", event_name, time_str, event.value2);
+                SDFile<SpeedFile>::Write("Started: %s at client time: %s.%03d\n", event_name, time_str, event.value2);
+                printf("Started: %s at client time: %s.%03d\n", event_name, time_str, event.value2);
+                multicore_launch_core1(core1_entry);
+            } else if (event.type == http::core::EventType::TimerStop) {
+                static constexpr int ARIZONA_OFFSET_SECONDS = -7 * 3600;  // UTC-7
+                uint32_t client_unix_time = event.value1 + ARIZONA_OFFSET_SECONDS;
+                char time_str[32];
+
+                unix_to_string(client_unix_time, time_str, sizeof(time_str));
+
+                const char* event_name = http::core::event_type_to_string(event.type);
+                SDFile<TelemetryFile>::Write("Stopped: %s at client time: %s.%03d\n", event_name, time_str, event.value2);
+                SDFile<HX711DataLog>::Write("Stopped: %s at client time: %s.%03d\n", event_name, time_str, event.value2);
+                SDFile<SpeedFile>::Write("Stopped: %s at client time: %s.%03d\n", event_name, time_str, event.value2);
+                printf("Stopped: %s at client time: %s.%03d\n", event_name, time_str, event.value2);
                 Message* msg = CommandChannel::acquire();
                 if (msg) {
                     msg->type = MSG_CMD_SHUTDOWN;
@@ -436,10 +439,10 @@ int main() {
                 } else {
                     printf("Failed to acquire Cmd buffer!");
                 }
-                
+
             } else {
-                printf("Event '%s' at %lu ms (v1=%d, v2=%d, f=%.2f)\n", 
-                    event.name.c_str(), 
+                printf("Event '%s' at %lu ms (v1=%d, v2=%d, f=%.2f)\n",
+                    http::core::event_type_to_string(event.type),
                     (unsigned long)event.timestamp,
                     event.value1, event.value2, event.fvalue);
             }

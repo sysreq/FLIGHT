@@ -1,9 +1,10 @@
 #include "dhcp_server.h"
+#include "../http_platform.h"
 #include "cyw43_config.h"
 
 extern "C" void dhcp_server_process_callback(void* arg, struct udp_pcb* upcb, struct pbuf* p,
                                             const ip_addr_t* src_addr, u16_t src_port) {
-    auto* server = static_cast<http::servers::DhcpServer*>(arg);
+    auto* server = static_cast<http::network::DhcpServer*>(arg);
     server->process_request(p, src_addr, src_port);
 }
 
@@ -25,10 +26,11 @@ constexpr uint8_t DHCP_OPT_MSG_TYPE = 53;
 constexpr uint8_t DHCP_OPT_SERVER_ID = 54;
 constexpr uint8_t DHCP_OPT_END = 255;
 
-constexpr uint16_t PORT_DHCP_SERVER = 67;
-constexpr uint16_t PORT_DHCP_CLIENT = 68;
-constexpr uint32_t DEFAULT_LEASE_TIME_S = 24 * 60 * 60;
-constexpr size_t DHCP_MIN_SIZE = 240 + 3;
+// Use config constants instead of duplicating them
+using config::dhcp::SERVER_PORT;
+using config::dhcp::CLIENT_PORT;
+using config::dhcp::LEASE_TIME_SECONDS;
+using config::dhcp::MIN_MESSAGE_SIZE;
 
 struct dhcp_msg_t {
     uint8_t op;
@@ -50,7 +52,7 @@ struct dhcp_msg_t {
 
 } // anonymous namespace
 
-namespace http::servers {
+namespace http::network {
 
 DhcpServer::~DhcpServer() {
     stop();
@@ -68,7 +70,7 @@ bool DhcpServer::start(const ip_addr_t* ip, const ip_addr_t* netmask) {
 
     udp_recv(udp_, ::dhcp_server_process_callback, this);
 
-    err_t err = udp_bind(udp_, IP_ANY_TYPE, PORT_DHCP_SERVER);
+    err_t err = udp_bind(udp_, IP_ANY_TYPE, SERVER_PORT);
     if (err != ERR_OK) {
         udp_remove(udp_);
         udp_ = nullptr;
@@ -100,13 +102,13 @@ void DhcpServer::process_request(struct ::pbuf* p, const ip_addr_t* src_addr, u1
         ~PbufGuard() { if (p) pbuf_free(p); }
     } pbuf_guard{p};
 
-    if (p->tot_len < DHCP_MIN_SIZE) {
+    if (p->tot_len < MIN_MESSAGE_SIZE) {
         return;
     }
 
     dhcp_msg_t dhcp_msg;
     size_t len = pbuf_copy_partial(p, &dhcp_msg, sizeof(dhcp_msg), 0);
-    if (len < DHCP_MIN_SIZE) {
+    if (len < MIN_MESSAGE_SIZE) {
         return;
     }
 
@@ -159,7 +161,7 @@ void DhcpServer::process_request(struct ::pbuf* p, const ip_addr_t* src_addr, u1
                 return;  // IP already in use by different MAC
             }
             
-            lease.expiry = static_cast<uint16_t>((cyw43_hal_ticks_ms() + DEFAULT_LEASE_TIME_S * 1000) >> 16);
+            lease.expiry = static_cast<uint16_t>((cyw43_hal_ticks_ms() + LEASE_TIME_SECONDS * 1000) >> 16);
             dhcp_msg.yiaddr[3] = DHCPS_BASE_IP + yi;
             opt_ptr = write_option(opt_ptr, DHCP_OPT_MSG_TYPE, DHCPACK);
             
@@ -179,11 +181,11 @@ void DhcpServer::process_request(struct ::pbuf* p, const ip_addr_t* src_addr, u1
     opt_ptr = write_option(opt_ptr, DHCP_OPT_SUBNET_MASK, 4, &ip4_addr_get_u32(ip_2_ip4(&netmask_)));
     opt_ptr = write_option(opt_ptr, DHCP_OPT_ROUTER, 4, &ip4_addr_get_u32(ip_2_ip4(&ip_)));
     opt_ptr = write_option(opt_ptr, DHCP_OPT_DNS, 4, &ip4_addr_get_u32(ip_2_ip4(&ip_)));
-    opt_ptr = write_option(opt_ptr, DHCP_OPT_IP_LEASE_TIME, DEFAULT_LEASE_TIME_S);
+    opt_ptr = write_option(opt_ptr, DHCP_OPT_IP_LEASE_TIME, LEASE_TIME_SECONDS);
     *opt_ptr++ = DHCP_OPT_END;
     
     struct ::netif* nif = ip_current_input_netif();
-    send_reply(nif, &dhcp_msg, opt_ptr - reinterpret_cast<uint8_t*>(&dhcp_msg), 0xffffffff, PORT_DHCP_CLIENT);
+    send_reply(nif, &dhcp_msg, opt_ptr - reinterpret_cast<uint8_t*>(&dhcp_msg), 0xffffffff, CLIENT_PORT);
 }
 
 int DhcpServer::find_lease_slot(const uint8_t* mac) {
@@ -275,4 +277,4 @@ bool DhcpServer::send_reply(struct ::netif* nif, const void* buf, size_t len, ui
     return err == ERR_OK;
 }
 
-} // namespace http::servers
+} // namespace http::network

@@ -1,8 +1,18 @@
 #pragma once
 
-#include "..\config\http_config.h"
+#include <cstddef>
+#include <cstdint>
+#include "../config/http_config.h"
 
-namespace http::servers {
+// Forward declare LWIP types for pointers/parameters
+struct udp_pcb;
+struct pbuf;
+typedef unsigned short u16_t;
+
+// Need full type for member variable
+#include "lwip/ip_addr.h"
+
+namespace http::network {
 
 class DnsServer {
 public:
@@ -25,4 +35,4 @@ private:
     ip_addr_t ip_{};
 };
 
-} // namespace http::servers
+} // namespace http::network

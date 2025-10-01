@@ -1,4 +1,6 @@
 #include "access_point.h"
+#include "http_platform.h"
+#include <cstdio>
 
 namespace http {
 

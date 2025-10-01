@@ -1,24 +1,20 @@
 #pragma once
 
-#include <algorithm>
-#include <array>
-#include <cstring>
-#include <cstdlib>
-#include <string>
-#include <queue>
+// ============================================
+// HTTP CONFIGURATION - Pure Constants Only
+// ============================================
+// This header contains ONLY configuration constants.
+// NO includes of platform headers (Pico SDK, LWIP, STL).
+// Files that need platform types should include http_platform.h
 
+#include <cstdint>
+#include <cstddef>
 
-#include "pico\critical_section.h"
-
-#include "lwipopts.h"
-
-#include <pico\cyw43_arch.h>
-
-#include <lwip\ip_addr.h>
-#include <lwip\udp.h>
-#include <lwip\tcp.h>
-#include <lwip\errno.h>
-#include <lwip\pbuf.h>
+// Platform-specific constant from Pico SDK
+// (defined here to avoid including cyw43_arch.h)
+#ifndef CYW43_AUTH_WPA2_AES_PSK
+#define CYW43_AUTH_WPA2_AES_PSK 0x00400004
+#endif
 
 namespace config {
 

@@ -32,12 +32,11 @@ project(FLIGHT C CXX ASM)
 pico_sdk_init()
 add_executable(FLIGHT main.cpp 
     storage/storage_impl.cpp
-    http/servers/dns_server.cpp
-    http/servers/dhcp_server.cpp
-    http/servers/http_events.cpp
-    http/servers/http_server.cpp
-    http/servers/http_router.cpp
-    http/servers/http_status.cpp
+    http/network/dns_server.cpp
+    http/network/dhcp_server.cpp
+    http/core/http_events.cpp
+    http/core/http_server.cpp
+    http/core/http_router.cpp
     http/ui/http_generator.cpp
     http/access_point.cpp
 )

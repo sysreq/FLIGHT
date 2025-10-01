@@ -1,24 +1,17 @@
 #pragma once
 
-#include "..\config\http_config.h"
+#include <queue>
+#include <cstddef>
+#include "events/event_types.h"
+#include "http_utils.h"
 
-namespace http::servers {
+#include "pico/critical_section.h"
 
-// Simple event structure
-struct Event {
-    std::string name;
-    int32_t value1 = 0;
-    int32_t value2 = 0;
-    float fvalue = 0.0f;
-    uint32_t timestamp;
-    
-    Event() : timestamp(to_ms_since_boot(get_absolute_time())) {}
-    Event(const std::string& n) : name(n), timestamp(to_ms_since_boot(get_absolute_time())) {}
-};
+namespace http::core {
 
 class HttpEventHandler {
 public:
-    static constexpr size_t MAX_QUEUE_SIZE = 32;
+    static constexpr size_t MAX_QUEUE_SIZE = constants::MAX_EVENT_QUEUE_SIZE;
     
     HttpEventHandler();
     ~HttpEventHandler();
@@ -38,4 +31,4 @@ private:
     bool initialized_ = false;
 };
 
-} // namespace http::servers
+} // namespace http::core

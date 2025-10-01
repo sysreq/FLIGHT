@@ -1,15 +1,26 @@
-
 #pragma once
 
-#include "..\config\http_config.h"
+#include <array>
+#include <cstddef>
+#include <cstdint>
+#include "../config/http_config.h"
 
-namespace http::servers {
+// Forward declare LWIP types for pointers/parameters
+struct udp_pcb;
+struct pbuf;
+struct netif;
+typedef unsigned short u16_t;
+
+// Need full type for member variables
+#include "lwip/ip_addr.h"
+
+namespace http::network {
 
 class DhcpServer {
 public:
-    static constexpr uint8_t DHCPS_BASE_IP = 16;
-    static constexpr uint8_t DHCPS_MAX_IP = 8;
-    static constexpr size_t MAC_LEN = 6;
+    static constexpr uint8_t DHCPS_BASE_IP = config::dhcp::BASE_IP;
+    static constexpr uint8_t DHCPS_MAX_IP = config::dhcp::MAX_CLIENTS;
+    static constexpr size_t MAC_LEN = config::dhcp::MAC_ADDRESS_LENGTH;
 
     struct Lease {
         std::array<uint8_t, MAC_LEN> mac{};
@@ -45,4 +56,4 @@ private:
     bool send_reply(struct ::netif* nif, const void* buf, size_t len, uint32_t dest_ip, uint16_t dest_port);
 };
 
-} // namespace http::servers
+} // namespace http::network

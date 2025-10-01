@@ -1,10 +1,23 @@
 #pragma once
 
-#include "..\config\http_config.h"
+#include <array>
+#include <cstddef>
+#include <cstdint>
+#include "../config/http_config.h"
 #include "http_events.h"
 #include "http_router.h"
 
-namespace http::servers {
+// Forward declare LWIP types for pointers/parameters
+struct tcp_pcb;
+struct pbuf;
+typedef signed char err_t;
+typedef unsigned short u16_t;
+
+// Need full type for member variable
+#include "lwip/ip_addr.h"
+#include "pico/time.h"
+
+namespace http::core {
 
 class HttpServer {
 public:    
@@ -23,20 +36,20 @@ public:
     bool start(const ip_addr_t* ip, absolute_time_t start_time);
     void stop();
     bool is_running() const { return server_pcb_ != nullptr; }
-    
-    // Callback handlers (must be public for C callbacks)
+
     err_t handle_accept(struct tcp_pcb* client_pcb, err_t err);
     err_t handle_recv(struct tcp_pcb* pcb, struct pbuf* p, err_t err, void* connection);
     err_t handle_sent(struct tcp_pcb* pcb, u16_t len, void* connection);
     void handle_error(err_t err, void* connection);
 
-    // Access to handlers
     HttpEventHandler& event_handler() { return event_handler_; }
     const HttpEventHandler& event_handler() const { return event_handler_; }
-    
-    // Access to status (if needed externally)
-    HttpStatusHandler& status_handler() { return router_.status_handler(); }
-    
+
+    TimerEventHandler& status_handler() { return router_.timer_handler(); }
+    TelemetryEventHandler& telemetry_handler() { return router_.telemetry_handler(); }
+    TimerEventHandler& timer_handler() { return router_.timer_handler(); }
+    EventDispatcher& event_dispatcher() { return router_.event_dispatcher(); }
+
     HttpServer(const HttpServer&) = delete;
     HttpServer& operator=(const HttpServer&) = delete;
     HttpServer(HttpServer&&) = delete;
@@ -45,21 +58,17 @@ public:
 private:
     struct tcp_pcb* server_pcb_ = nullptr;
     ip_addr_t ip_{};
-    
-    // Core components - statically allocated
+
     HttpEventHandler event_handler_;
     HttpRequestRouter router_;
-    
-    // Connection pool
+
     std::array<Connection, config::http::MAX_CONNECTIONS> connections_{};
-    
-    // Connection management
+
     Connection* allocate_connection();
     void free_connection(Connection* conn);
     err_t close_connection(Connection* conn, struct tcp_pcb* pcb, err_t close_err);
-    
-    // Request processing (delegates to router)
+
     void process_request(Connection* conn, const char* request, size_t len);
 };
 
-} // namespace http::servers
+} // namespace http::core
