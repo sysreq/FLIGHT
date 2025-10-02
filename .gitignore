@@ -1,2 +1,4 @@
 build
 !.vscode/*
+.claude/network_quick_reference.md
+.claude/network_refactoring_spec.md

@@ -1,457 +1,151 @@
-#include <ctime>
+/**
+ * Network Subsystem Test - Access Point Mode
+ *
+ * This test program demonstrates the new network subsystem in AP mode.
+ * The Pico W creates its own WiFi access point and serves HTTP:
+ *   - GET / : Returns a welcome page with link to status
+ *   - GET /status : Returns JSON with simulated sensor data
+ *
+ * To test:
+ *   1. Flash to Pico W
+ *   2. Connect to WiFi network "PICO_AP" (password: "password123")
+ *   3. Your device will auto-configure via DHCP
+ *   4. Navigate to http://192.168.4.1/ or any domain (captive portal DNS)
+ */
 
-#include "pico\stdlib.h"
-#include "pico\stdio.h"
-#include "pico\multicore.h"
-#include "pico\cyw43_arch.h"
+#include "pico/stdlib.h"
+#include "pico/cyw43_arch.h"
+#include "network/network.h"
+#include "network/services/dhcp_service.h"
+#include "network/services/dns_service.h"
+#include "lwip/netif.h"
+#include "lwip/ip4_addr.h"
+#include <cstdio>
+#include <cmath>
 
-#include "common\channels.h"
-
-#include "http\access_point.h"
-
-//#include "storage.h"
-#include "sdcard.h"
-#include "i2c.h"
-
-#include "adc\hx711.h"
-
-using TelemetryBus = i2c::I2CBus<i2c0, 4, 5, 400000>;  // SDA=4, SCL=5, 400kHz
-
-template<typename T>
-inline bool is_failure(T expr) {
-    if constexpr (std::is_same_v<std::remove_cvref_t<T>, int>) {
-        return expr < 0;
-    } else if constexpr (std::is_same_v<std::remove_cvref_t<T>, bool>) {
-        return expr == false;
-    }
-    return false;
-}
-
-#define LOG printf
-
-#define REQUIRE(expr, msg) \
-    if (is_failure(expr)) { \
-        printf(msg); \
-        sleep_ms(50); \
-        return -1; \
-    }
-
-struct SensorData {};
-struct SystemCommands {};
-
-using SensorChannel = MessageChannel<SensorData>;
-using CommandChannel = MessageChannel<SystemCommands>;
-
-enum SensorTypes : uint8_t {
-    MSG_IMU_DATA = 1,
-    MSG_BMP581_DATA = 2,
-    MSG_MS4525_DATA = 3
-};
-
-void handle_imu_data(const i2c::drivers::icm20948_data& data) {
-    if (data.valid) {
-        Message* msg = SensorChannel::acquire();
-        if (msg) {
-            msg->type = MSG_IMU_DATA;
-            msg->Put(data);
-            SensorChannel::commit(msg);
-        } else {
-            LOG("Failed to acquire ICM buffer!");
-        }
-    }
-}
-
-void handle_bmp581_data(const i2c::drivers::bmp581_data& data) {
-    if (data.valid) {
-        Message* msg = SensorChannel::acquire();
-        if (msg) {
-            msg->type = MSG_BMP581_DATA;
-            msg->Put(data);
-            SensorChannel::commit(msg);
-        } else {
-            LOG("Failed to acquire BMP buffer!");
-        }
-    }
-}
-
-void handle_ms4525d0_data(const i2c::drivers::ms4525d0_data data) {
-    static std::array<i2c::drivers::ms4525d0_data, 16> oversample;
-    static size_t sample_size = 0;
-
-    oversample[sample_size++] = data;
-
-    if (sample_size >= 16) {
-        float avg_pressure = 0.0f;
-        float avg_temperature = 0.0f;
-        int valid_count = 0;
-        
-        for (const auto& sample : oversample) {
-            if(sample.valid == true) {
-                valid_count += 1;
-                avg_pressure += sample.pressure_pa;
-                avg_temperature += sample.temperature_c;
-            }
-
-        }
-        
-        if(valid_count > 0) {
-            Message* msg = SensorChannel::acquire();
-            if (msg) {
-                i2c::drivers::ms4525d0_data temp;
-                temp.pressure_pa = avg_pressure / valid_count;
-                temp.temperature_c = avg_temperature / valid_count;
-
-                msg->type = MSG_MS4525_DATA;
-                msg->Put(temp);
-                SensorChannel::commit(msg);
-            } else {
-                LOG("Failed to acquire MS4525 buffer!");
-            }
-        }
-        
-        sample_size = 0;
-    }
-}
-
-int init_i2c_bus0() {
-    using namespace i2c::drivers;
-
-    LOG("---------- STARTING I2C BUS 0 (IMU and BMP) ----------\n");
-    REQUIRE(TelemetryBus::start(), "Failed to initialize I2C bus");
-    //REQUIRE(TelemetryBus::add_device<ICM20948>(handle_imu_data), "Failed to add ICM20948\n");
-    REQUIRE(TelemetryBus::add_device<MS4525D0>(handle_ms4525d0_data), "Failed to add the MS4525D0\n");
-    REQUIRE(TelemetryBus::add_device<BMP581>(handle_bmp581_data), "Failed to add BMP581\n");
-    LOG("----------  I2C BUS 0 ONLINE ----------\n");
-    return 0;
-}
-
-enum CommandTypes : uint8_t {
-    MSG_CMD_SHUTDOWN = 1
-};
-
-bool check_for_exit() {
-    int c = getchar_timeout_us(0);
-    if (c == 'x' || c == 'X') {
-        Message* msg = CommandChannel::acquire();
-        if (msg) {
-            msg->type = MSG_CMD_SHUTDOWN;
-            CommandChannel::commit(msg);
-        } else {
-            LOG("Failed to acquire Cmd buffer!");
-        }
-        return true;
-    }
-    return false;
-}
-
-void core1_entry() {
-    printf("---------- ENABLING DATA POLLING ----------\n");
-    TelemetryBus::enable();
-
-    while(true) {
-        if (!CommandChannel::empty()) { 
-            Message* msg = CommandChannel::pop();
-            if (msg && msg->type == MSG_CMD_SHUTDOWN) {
-                CommandChannel::release(msg); 
-                break;
-            }
-            sleep_ms(100);
-        }
-    }
-
-    TelemetryBus::disable();
-    printf("---------- DISABLING DATA POLLING ----------\n");
-
-    using namespace sdcard;
-    SDFile<TelemetryFile>::Sync();
-    SDFile<SpeedFile>::Sync();
-    SDFile<HX711DataLog>::Sync();
-
-    printf("Synced.\n");
-}
-
-int init_file_system() {
-    using namespace sdcard;
-    LOG("---------- STARTING FILESYSTEM ----------\n");
-    REQUIRE(SDCard::mount(), "Failed to mount SDCard.\n");
-    REQUIRE(SDFile<LogFile>::Open(), "Failed to initialize LogFile.\n");
-    REQUIRE(SDFile<TelemetryFile>::Open(), "Failed to initialize TelemetryFile.\n");
-    REQUIRE(SDFile<SpeedFile>::Open(), "Failed to initialize SpeedFile.\n");
-    REQUIRE(SDFile<HX711DataLog>::Open(), "Failed to initialize HX711DataLog.\n");
-    LOG("---------- FILESYSTEM ONLINE ----------\n");
-    return 0;
-}
-
-int main2() {
-    stdio_init_all();
-    sleep_ms(5000);
-
-    REQUIRE(init_i2c_bus0(), "Failed to start inertial sensor bus.\n");
-
-    sleep_ms(1000);
-
-    LOG("---------- STARTING MAIN LOOP ----------\n");
-    
-    bool running = true;
-
-    uint32_t last_sync = to_ms_since_boot(get_absolute_time());
-    uint32_t writes_since_sync = 0;
-
-    uint32_t imu_last = 0;
-    uint32_t bmp_last = 0;
-    uint32_t air_last = 0;
-
-    multicore_launch_core1(core1_entry);
-
-    while (running) {
-        if(check_for_exit()) {
-            sleep_ms(200);
-            running = false;
-        }
-
-        while (!SensorChannel::empty()) {
-            using namespace i2c::drivers;
-            Message* msg = SensorChannel::pop();
-            if (msg) {
-                switch(msg->type) {
-                    case MSG_IMU_DATA: {
-                        const auto* imu_data = msg->As<icm20948_data>();
-                        // SDFile<TelemetryFile>::Write("IMU: Accel=[%.2f, %.2f, %.2f] m/s², Gyro=[%.2f, %.2f, %.2f] rad/s\n",
-                        //     imu_data->accel_x, imu_data->accel_y, imu_data->accel_z,
-                        //     imu_data->gyro_x, imu_data->gyro_y, imu_data->gyro_z);
-                        // SDFile<IMUTimeFile>::Write("%d\n", msg->acquire_time - imu_last);
-                        imu_last = msg->acquire_time;
-                        writes_since_sync++;
-                        break;
-                    }
-
-                    case MSG_MS4525_DATA: {
-                        const auto* ms4525_data = msg->As<ms4525d0_data>();
-                        // SDFile<TelemetryFile>::Write("Pressure: %.2f Pa, Temp: %.1f°C (16x oversample)\n", 
-                        //         ms4525_data->pressure_pa, ms4525_data->temperature_c);
-                        // SDFile<AIRTimeFile>::Write("%d\n", msg->acquire_time - air_last);
-                        air_last = msg->acquire_time;
-                        writes_since_sync++;
-                        break;
-                    }
-                }
-                SensorChannel::release(msg); 
-            }
-        }
-    
-        sleep_ms(1);
-    }
-    
-    LOG("---------- STOPPED MAIN LOOP ----------\n");
-
-    sleep_ms(500);
-    LOG("Sensor Queue Empty? %s\n", SensorChannel::empty() ? "True" : "False");
-    LOG("Logger shutting down.\n");
-    sleep_ms(500);
-    sleep_ms(500);
-    LOG("Goodbye.\n");
-    return 0;
-}
-
-void unix_to_string(uint32_t unix_time, char* buffer, size_t buffer_size) {
-    time_t rawtime = unix_time;
-    struct tm* timeinfo = gmtime(&rawtime);
-    
-    strftime(buffer, buffer_size, "%Y-%m-%d %H:%M:%S", timeinfo);
-}
-
-int main3() {
-    stdio_init_all();
-    sleep_ms(1000);
-
-    http::AccessPoint access_point;
-    if (!access_point.initialize()) {
-        printf("Failed to initialize access point!\n");
-        return 1;
-    }
-    printf("Access point started successfully\n");
-
-    int32_t update_time = time_us_32();
-    int32_t now = update_time;
-
-    while (!access_point.is_shutdown_requested()) {
-        #if PICO_CYW43_ARCH_POLL
-        cyw43_arch_poll();
-        cyw43_arch_wait_for_work_until(make_timeout_time_ms(50));
-        #else
-        sleep_ms(50);
-        #endif
-        
-        http::core::Event event;
-        if (access_point.event_handler().pop_event(event)) {
-            if (event.type == http::core::EventType::TimerStart || event.type == http::core::EventType::TimerStop) {
-                static constexpr int ARIZONA_OFFSET_SECONDS = -7 * 3600;  // UTC-7
-                uint32_t client_unix_time = event.value1 + ARIZONA_OFFSET_SECONDS;
-                char time_str[32];
-
-                unix_to_string(client_unix_time, time_str, sizeof(time_str));
-
-                printf("Event: %s at client time: %s.%03d\n", http::core::event_type_to_string(event.type), time_str, event.value2);
-            } else {
-                printf("Event '%s' at %lu ms (v1=%d, v2=%d, f=%.2f)\n",
-                    http::core::event_type_to_string(event.type),
-                    (unsigned long)event.timestamp,
-                    event.value1, event.value2, event.fvalue);
-            }
-        }
-        
-        now = time_us_32();
-        if(now - update_time > 10'000'000) {
-            update_time = now;
-            printf("Beep.\n");
-        }
-    }
-    
-    printf("Shutting down...\n");
-    return 0;
-}
+// Access Point configuration
+#define AP_SSID "PICO_AP"
+#define AP_PASSWORD "password123"
 
 int main() {
-    using namespace sdcard;
-    using namespace adc;
-    using namespace i2c;
-    using namespace i2c::drivers;
-
+    // Initialize stdio for debug output
     stdio_init_all();
     sleep_ms(3000);
-
-    printf("---------- STARTING FILESYSTEM ----------\n");
-    REQUIRE(SDCard::mount(), "Failed to mount SDCard.\n");
-    REQUIRE(SDFile<LogFile>::Open(), "Failed to initialize LogFile.\n");
-    REQUIRE(SDFile<TelemetryFile>::Open(), "Failed to initialize TelemetryFile.\n");
-    REQUIRE(SDFile<SpeedFile>::Open(), "Failed to initialize SpeedFile.\n");
-    REQUIRE(SDFile<HX711DataLog>::Open(), "Failed to initialize HX711DataLog.\n");
-    printf("---------- FILESYSTEM ONLINE ----------\n");
-
-    printf("---------- STARTING I2C BUS 0 (IMU and BMP) ----------\n");
-    REQUIRE(TelemetryBus::start(), "Failed to initialize I2C bus");
-    //REQUIRE(TelemetryBus::add_device<MS4525D0>(handle_ms4525d0_data), "Failed to add the MS4525D0\n");
-    REQUIRE(TelemetryBus::add_device<BMP581>(handle_bmp581_data), "Failed to add BMP581\n");
-    LOG("----------  I2C BUS 0 ONLINE ----------\n");
-
-    HX711 loadcell;
-    if (loadcell.init()) {
-        int32_t value;
-        if (loadcell.read_raw(value)) {
-            printf("Load cell initialized.\n");
-            sleep_ms(100);
-        }
-    }
-
-    http::AccessPoint access_point;
-    if (!access_point.initialize()) {
-        printf("Failed to initialize access point!\n");
+    printf("\n");
+    printf("========================================\n");
+    printf("  Network Subsystem Test (AP Mode)\n");
+    printf("========================================\n");
+    sleep_ms(3000);
+    // Initialize CYW43 wireless chip
+    if (cyw43_arch_init()) {
+        printf("ERROR: Failed to initialize CYW43\n");
         return 1;
     }
-    printf("Access point started successfully\n");
-    
-    uint32_t last_loadcell = 0;
-    uint32_t last_save = 0;
-    uint32_t save_sequence = 0;
 
-    while(!check_for_exit()) {
-        int now = time_us_32();
+    // Start access point
+    printf("Starting WiFi Access Point...\n");
+    printf("SSID: %s\n", AP_SSID);
+    printf("Password: %s\n", AP_PASSWORD);
+    cyw43_arch_enable_ap_mode(AP_SSID, AP_PASSWORD, CYW43_AUTH_WPA2_AES_PSK);
 
-        if (now - last_loadcell > 20'000 && loadcell.update()) {
-            auto data = loadcell.get_data();
-            SDFile<HX711DataLog>::Write("Load: %.2f | Tared: %d | Raw: %d\n | Time: %d", data.weight, data.tared_value, data.raw_value, now/1000);
-            access_point.telemetry_handler().force = data.weight; 
-            last_loadcell = now;
-        }
+    // Configure static IP for the AP (192.168.4.1)
+    ip4_addr_t ipaddr, netmask, gateway;
+    IP4_ADDR(&ipaddr, 192, 168, 4, 1);
+    IP4_ADDR(&netmask, 255, 255, 255, 0);
+    IP4_ADDR(&gateway, 192, 168, 4, 1);
 
+    netif_set_addr(netif_default, &ipaddr, &netmask, &gateway);
 
-        while (!SensorChannel::empty()) {
-            using namespace i2c::drivers;
-            Message* msg = SensorChannel::pop();
-            if (msg) {
-                switch(msg->type) {
-                    case MSG_BMP581_DATA: {
-                        const auto* bmp_data = msg->As<bmp581_data>();
-                        SDFile<TelemetryFile>::Write("BMP581: Temp=%.2f°C, Pressure=%.1f Pa, Altitude=%.1f m\n",
-                        bmp_data->temperature, bmp_data->pressure, bmp_data->altitude);
-                        access_point.telemetry_handler().altitude = bmp_data->altitude;   // Altitude value  
-                        break; }
-                    case MSG_MS4525_DATA: {
-                        const auto* ms4525_data = msg->As<ms4525d0_data>();
-                        SDFile<SpeedFile>::Write("Pressure: %.2f Pa, Temp: %.1f°C (16x oversample)\n", 
-                                 ms4525_data->pressure_pa, ms4525_data->temperature_c);
-                        break; }
-                }
-                SensorChannel::release(msg);
-            }
-        }
-        if (now - last_save > 1'000'000) {
-            if(save_sequence == 0)
-                SDFile<TelemetryFile>::Sync();
-            else if(save_sequence == 1)
-                SDFile<SpeedFile>::Sync();
-            else if(save_sequence == 2)
-                SDFile<HX711DataLog>::Sync();
-            else 
-                save_sequence = 0;
-            save_sequence += 1;
-            last_save = now;
-        }
+    printf("Access Point started!\n");
+    printf("IP Address: %s\n", ip4addr_ntoa(&ipaddr));
 
+    // Validate IP configuration
+    if (ip4_addr_isany(&ipaddr)) {
+        printf("ERROR: Invalid IP address configuration\n");
+        cyw43_arch_deinit();
+        return 1;
+    }
+
+    // Start DHCP server
+    printf("\nStarting DHCP server...\n");
+    network::services::DhcpService dhcp_service;
+    dhcp_service.Configure(&ipaddr, &netmask);
+    if (!dhcp_service.Start()) {
+        printf("ERROR: Failed to start DHCP server\n");
+        cyw43_arch_deinit();
+        return 1;
+    }
+
+    // Start DNS server (captive portal)
+    printf("Starting DNS server...\n");
+    network::services::DnsService dns_service;
+    dns_service.Configure(&ipaddr);
+    if (!dns_service.Start()) {
+        printf("ERROR: Failed to start DNS server\n");
+        dhcp_service.Stop();
+        cyw43_arch_deinit();
+        return 1;
+    }
+
+    // Start network subsystem
+    printf("\n");
+    if (!network::Start()) {
+        printf("ERROR: Failed to start network subsystem\n");
+        dns_service.Stop();
+        dhcp_service.Stop();
+        cyw43_arch_deinit();
+        return 1;
+    }
+
+    printf("\n");
+    printf("========================================\n");
+    printf("  HTTP Server Running\n");
+    printf("========================================\n");
+    printf("Visit http://192.168.4.1/ in your browser\n");
+    printf("Press CTRL+C to exit\n");
+    printf("\n");
+
+    // Simulate sensor data updates
+    uint32_t uptime = 0;
+    float simulated_force = 0.0f;
+    float simulated_speed = 0.0f;
+
+    while (true) {
+        // Poll CYW43 and lwIP stack
         #if PICO_CYW43_ARCH_POLL
         cyw43_arch_poll();
-        cyw43_arch_wait_for_work_until(make_timeout_time_ms(50));
-        #else
-        sleep_ms(50);
         #endif
-        
-        http::core::Event event;
-        if (access_point.event_handler().pop_event(event)) {
-            if (event.type == http::core::EventType::TimerStart) {
-                static constexpr int ARIZONA_OFFSET_SECONDS = -7 * 3600;  // UTC-7
-                uint32_t client_unix_time = event.value1 + ARIZONA_OFFSET_SECONDS;
-                char time_str[32];
 
-                unix_to_string(client_unix_time, time_str, sizeof(time_str));
-
-                const char* event_name = http::core::event_type_to_string(event.type);
-                SDFile<TelemetryFile>::Write("Started: %s at client time: %s.%03d\n", event_name, time_str, event.value2);
-                SDFile<HX711DataLog>::Write("Started: %s at client time: %s.%03d\n", event_name, time_str, event.value2);
-                SDFile<SpeedFile>::Write("Started: %s at client time: %s.%03d\n", event_name, time_str, event.value2);
-                printf("Started: %s at client time: %s.%03d\n", event_name, time_str, event.value2);
-                multicore_launch_core1(core1_entry);
-            } else if (event.type == http::core::EventType::TimerStop) {
-                static constexpr int ARIZONA_OFFSET_SECONDS = -7 * 3600;  // UTC-7
-                uint32_t client_unix_time = event.value1 + ARIZONA_OFFSET_SECONDS;
-                char time_str[32];
-
-                unix_to_string(client_unix_time, time_str, sizeof(time_str));
-
-                const char* event_name = http::core::event_type_to_string(event.type);
-                SDFile<TelemetryFile>::Write("Stopped: %s at client time: %s.%03d\n", event_name, time_str, event.value2);
-                SDFile<HX711DataLog>::Write("Stopped: %s at client time: %s.%03d\n", event_name, time_str, event.value2);
-                SDFile<SpeedFile>::Write("Stopped: %s at client time: %s.%03d\n", event_name, time_str, event.value2);
-                printf("Stopped: %s at client time: %s.%03d\n", event_name, time_str, event.value2);
-                Message* msg = CommandChannel::acquire();
-                if (msg) {
-                    msg->type = MSG_CMD_SHUTDOWN;
-                    CommandChannel::commit(msg);
-                } else {
-                    printf("Failed to acquire Cmd buffer!");
-                }
-
-            } else {
-                printf("Event '%s' at %lu ms (v1=%d, v2=%d, f=%.2f)\n",
-                    http::core::event_type_to_string(event.type),
-                    (unsigned long)event.timestamp,
-                    event.value1, event.value2, event.fvalue);
-            }
+        // Update simulated sensor values
+        simulated_force += 0.1f;
+        if (simulated_force > 100.0f) {
+            simulated_force = 0.0f;
         }
 
-        sleep_ms(1);
+        simulated_speed = 50.0f + 10.0f * sinf(uptime * 0.01f);
+
+        // Update network status
+        network::Status::SetForce(simulated_force);
+        network::Status::SetSpeed(simulated_speed);
+        network::Status::SetUptime(uptime);
+
+        // Print status every 10 seconds
+        if (uptime % 10 == 0) {
+            printf("[%05u] Force: %.2f, Speed: %.2f\n",
+                   uptime, simulated_force, simulated_speed);
+        }
+
+        uptime++;
+        sleep_ms(1000);
     }
-    SDFile<TelemetryFile>::Sync();
-    SDFile<HX711DataLog>::Sync();
-    printf("Shutting down...\n");
+
+    // Cleanup (unreachable in this test, but shows proper shutdown)
+    network::Stop();
+    dns_service.Stop();
+    dhcp_service.Stop();
+    cyw43_arch_disable_ap_mode();
+    cyw43_arch_deinit();
+    printf("Network stopped\n");
+
     return 0;
 }
