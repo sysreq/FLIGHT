@@ -4,41 +4,137 @@
 
 namespace network::handlers {
     void HandleIndex(platform::Connection& conn) {
-        // Calculate content length first for proper HTTP header
-        const char* body =
+        const char* html =
             "<!DOCTYPE html>"
-            "<html><head><title>Network Test</title></head>"
-            "<body>"
-            "<h1>Hello from RP2350!</h1>"
-            "<p><a href='/status'>View Status</a></p>"
-            "</body></html>";
+            "<html><head>"
+            "<meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'>"
+            "<title>Flight Session Control</title>"
+            "<style>"
+            "body{font-family:Arial,sans-serif;max-width:800px;margin:40px auto;padding:20px;background:#f5f5f5}"
+            "h1{text-align:center;color:#333}"
+            ".timer{font-size:48px;font-weight:bold;text-align:center;margin:20px 0;color:#007bff}"
+            ".controls{text-align:center;margin:30px 0}"
+            ".btn{padding:15px 40px;margin:10px;font-size:18px;border:none;border-radius:5px;cursor:pointer}"
+            ".btn:disabled{opacity:0.5;cursor:not-allowed}"
+            ".btn-start{background:#28a745;color:white}"
+            ".btn-start:hover:not(:disabled){background:#218838}"
+            ".btn-stop{background:#dc3545;color:white}"
+            ".btn-stop:hover:not(:disabled){background:#c82333}"
+            ".sensors{background:white;border-radius:8px;padding:20px;box-shadow:0 2px 4px rgba(0,0,0,0.1)}"
+            ".sensor{display:flex;justify-content:space-between;padding:12px;border-bottom:1px solid #eee}"
+            ".sensor:last-child{border-bottom:none}"
+            ".sensor-name{font-weight:bold;color:#555}"
+            ".sensor-value{color:#007bff}"
+            ".status-ready{color:#28a745}"
+            ".status-failed{color:#dc3545}"
+            "</style>"
+            "</head><body>"
+            "<h1>Flight Session Control</h1>"
+            "<div class='timer' id='timer'>00:00:00</div>"
+            "<div class='controls'>"
+            "<button id='btnStart' class='btn btn-start'>Start Session</button>"
+            "<button id='btnStop' class='btn btn-stop'>Stop Session</button>"
+            "</div>"
+            "<div class='sensors'><h2>Sensors</h2>"
+            "<div class='sensor'><span class='sensor-name'>Airspeed</span><span id='airspeed'>-</span></div>"
+            "<div class='sensor'><span class='sensor-name'>Force</span><span id='force'>-</span></div>"
+            "<div class='sensor'><span class='sensor-name'>Power</span><span id='power'>-</span></div>"
+            "<div class='sensor'><span class='sensor-name'>Accel</span><span id='accel'>-</span></div>"
+            "<div class='sensor'><span class='sensor-name'>Gyro</span><span id='gyro'>-</span></div>"
+            "</div>"
+            "<script>"
+            "let sessionActive=false,sessionTimer=null,sensorTimer=null;"
+            "const btnStart=document.getElementById('btnStart');"
+            "const btnStop=document.getElementById('btnStop');"
+            "const timerEl=document.getElementById('timer');"
+            "function updateTimer(s){"
+            "const h=Math.floor(s/3600),m=Math.floor((s%3600)/60),sec=s%60;"
+            "timerEl.textContent=`${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}`;"
+            "}"
+            "function updateButtons(){"
+            "btnStart.disabled=sessionActive;btnStop.disabled=!sessionActive;"
+            "}"
+            "async function startSession(){"
+            "try{"
+            "await fetch('/api/session',{method:'POST'});"
+            "pollSessionStatus();"
+            "}catch(e){console.error('Start failed:',e);}"
+            "}"
+            "async function stopSession(){"
+            "try{"
+            "await fetch('/api/session',{method:'DELETE'});"
+            "pollSessionStatus();"
+            "}catch(e){console.error('Stop failed:',e);}"
+            "}"
+            "async function pollSessionStatus(){"
+            "try{"
+            "const r=await fetch('/api/session/status');"
+            "const d=await r.json();"
+            "sessionActive=d.active||false;"
+            "if(sessionActive){"
+            "updateTimer(d.elapsed||0);"
+            "if(!sessionTimer)sessionTimer=setInterval(pollSessionStatus,1000);"
+            "if(!sensorTimer)sensorTimer=setInterval(pollSensors,500);"
+            "}else{"
+            "updateTimer(0);"
+            "if(sessionTimer){clearInterval(sessionTimer);sessionTimer=null;}"
+            "if(sensorTimer){clearInterval(sensorTimer);sensorTimer=null;}"
+            "pollSensors();"
+            "}"
+            "updateButtons();"
+            "}catch(e){console.error('Session status failed:',e);}"
+            "}"
+            "async function pollSensors(){"
+            "try{"
+            "const r=await fetch('/api/sensors');"
+            "const d=await r.json();"
+            "if(sessionActive){"
+            "document.getElementById('airspeed').innerHTML=`<span class='sensor-value'>${d.airspeed.value.toFixed(2)} ${d.airspeed.unit}</span>`;"
+            "document.getElementById('force').innerHTML=`<span class='sensor-value'>${d.force.value.toFixed(2)} ${d.force.unit}</span>`;"
+            "document.getElementById('power').innerHTML=`<span class='sensor-value'>${d.power.value.toFixed(2)} ${d.power.unit}</span>`;"
+            "document.getElementById('accel').innerHTML=`<span class='sensor-value'>X:${d.accel.x.toFixed(2)} Y:${d.accel.y.toFixed(2)} Z:${d.accel.z.toFixed(2)} ${d.accel.unit}</span>`;"
+            "document.getElementById('gyro').innerHTML=`<span class='sensor-value'>X:${d.gyro.x.toFixed(3)} Y:${d.gyro.y.toFixed(3)} Z:${d.gyro.z.toFixed(3)} ${d.gyro.unit}</span>`;"
+            "}else{"
+            "document.getElementById('airspeed').innerHTML=`<span class='status-${d.airspeed.toLowerCase()}'>${d.airspeed}</span>`;"
+            "document.getElementById('force').innerHTML=`<span class='status-${d.force.toLowerCase()}'>${d.force}</span>`;"
+            "document.getElementById('power').innerHTML=`<span class='status-${d.power.toLowerCase()}'>${d.power}</span>`;"
+            "document.getElementById('accel').innerHTML=`<span class='status-${d.accel.toLowerCase()}'>${d.accel}</span>`;"
+            "document.getElementById('gyro').innerHTML=`<span class='status-${d.gyro.toLowerCase()}'>${d.gyro}</span>`;"
+            "}"
+            "}catch(e){console.error('Sensor poll failed:',e);}"
+            "}"
+            "btnStart.addEventListener('click',startSession);"
+            "btnStop.addEventListener('click',stopSession);"
+            "pollSessionStatus();"
+            "setInterval(()=>{if(!sessionActive)pollSensors();},10000);"
+            "</script></body></html>";
 
-        size_t body_len = strlen(body);
-
-        // Format HTTP response with Content-Length header
-        char response[512];  // Local buffer for formatting
-        int written = snprintf(response, sizeof(response),
+        size_t body_len = strlen(html);
+        char header[256];
+        int header_len = snprintf(header, sizeof(header),
             "HTTP/1.1 200 OK\r\n"
-            "Content-Type: text/html\r\n"
+            "Content-Type: text/html; charset=utf-8\r\n"
             "Content-Length: %zu\r\n"
-            "\r\n"
-            "%s",
-            body_len, body);
+            "\r\n",
+            body_len);
 
-        // Check for buffer overflow protection
-        if (written < 0 || static_cast<size_t>(written) >= sizeof(response)) {
-            // Response too large for local buffer
+        if (header_len < 0 || static_cast<size_t>(header_len) >= sizeof(header)) {
+            printf("Index: Header generation failed\n");
             return;
         }
 
-        // Check if response fits in connection buffer
-        if (static_cast<size_t>(written) > conn.response_buffer.size()) {
-            // Response too large for connection buffer
+        size_t total_len = header_len + body_len;
+        printf("Index: HTML size=%zu, Header size=%d, Total=%zu, Buffer size=%zu\n",
+               body_len, header_len, total_len, conn.response_buffer.size());
+
+        if (total_len > conn.response_buffer.size()) {
+            printf("Index: Response too large for buffer!\n");
             return;
         }
 
-        // Safe to copy now
-        std::memcpy(conn.response_buffer.data(), response, written);
-        conn.response_length = written;
+        std::memcpy(conn.response_buffer.data(), header, header_len);
+        std::memcpy(conn.response_buffer.data() + header_len, html, body_len);
+        conn.response_length = total_len;
+        printf("Index: Response prepared, length=%zu\n", total_len);
     }
 }

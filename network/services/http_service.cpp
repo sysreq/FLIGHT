@@ -74,7 +74,7 @@ namespace network::services {
         size_t method_len = method_end - buf;
         std::string_view method(buf, method_len);
 
-        // Validate HTTP method (only support GET for now)
+        // Validate HTTP method
         HttpMethod http_method;
         if (method == "GET") {
             http_method = HttpMethod::GET;
@@ -122,14 +122,8 @@ namespace network::services {
             }
         }
 
-        // For now, we only handle GET requests properly
-        if (http_method != HttpMethod::GET) {
-            SendMethodNotAllowed(conn);
-            return;
-        }
-
-        // Dispatch to handler
-        handlers::Dispatch(conn, path);
+        // Dispatch to handler (now supports both GET and POST)
+        handlers::Dispatch(conn, path, http_method);
     }
 
     void HttpService::SendMethodNotAllowed(platform::Connection& conn) {

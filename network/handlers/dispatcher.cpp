@@ -3,10 +3,12 @@
 #include <cstring>
 
 namespace network::handlers {
-    void Dispatch(platform::Connection& conn, std::string_view path) {
-        // Find matching route
+    void Dispatch(platform::Connection& conn, std::string_view path, HttpMethod method) {
+        // Find matching route (match both path and method)
         auto it = std::find_if(g_routes.begin(), g_routes.end(),
-            [path](const Route& route) { return route.path == path; });
+            [path, method](const Route& route) {
+                return route.path == path && route.method == method;
+            });
 
         if (it != g_routes.end()) {
             it->handler(conn);

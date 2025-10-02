@@ -16,12 +16,14 @@ namespace network::platform {
         std::array<char, RESPONSE_BUFFER_SIZE> response_buffer;
         size_t request_length;
         size_t response_length;
+        size_t response_sent;  // Tracks how much of response has been sent
         bool in_use;
 
         void Reset() {
             tcp_handle = nullptr;
             request_length = 0;
             response_length = 0;
+            response_sent = 0;
             in_use = false;
         }
     };

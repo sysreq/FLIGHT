@@ -10,6 +10,8 @@ add_library(network
     handlers/dispatcher.cpp
     handlers/handler_index.cpp
     handlers/handler_status.cpp
+    handlers/handler_session.cpp
+    handlers/handler_sensors.cpp
 )
 
 target_include_directories(network PUBLIC

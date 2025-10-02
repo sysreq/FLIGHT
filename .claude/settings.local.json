@@ -3,7 +3,8 @@
     "allow": [
       "Bash(tree:*)",
       "Bash(cmake:*)",
-      "Bash(dir build)"
+      "Bash(dir build)",
+      "Bash(cat:*)"
     ],
     "deny": [],
     "ask": []

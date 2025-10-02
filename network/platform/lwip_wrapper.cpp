@@ -62,31 +62,34 @@ namespace network::platform::lwip {
 
     std::expected<size_t, ErrorCode> Send(TcpHandle handle, std::span<const char> data) {
         if (!handle) {
+            printf("Send: Invalid handle\n");
             return std::unexpected(ErrorCode::InvalidParameter);
         }
 
         tcp_pcb* pcb = static_cast<tcp_pcb*>(handle);
 
-        // Check available space in send buffer
+        // Check how much space is available in the send buffer
         size_t available = tcp_sndbuf(pcb);
+        printf("Send: Requested=%zu, Available=%zu\n", data.size(), available);
+
         if (available == 0) {
+            printf("Send: No buffer space (will rely on callback)\n");
             return std::unexpected(ErrorCode::SendFailed);
         }
 
-        // Send only what fits in buffer
+        // Send only what fits in the buffer
         size_t to_send = (data.size() < available) ? data.size() : available;
 
         err_t err = tcp_write(pcb, data.data(), to_send, TCP_WRITE_FLAG_COPY);
         if (err != ERR_OK) {
+            printf("Send: tcp_write failed with error %d\n", err);
             return std::unexpected(ErrorCode::SendFailed);
         }
 
-        // Flush the data
-        err = tcp_output(pcb);
-        if (err != ERR_OK) {
-            return std::unexpected(ErrorCode::SendFailed);
-        }
+        // Trigger output
+        tcp_output(pcb);
 
+        printf("Send: Enqueued %zu bytes (callback will handle remainder)\n", to_send);
         return to_send;
     }
 
@@ -113,6 +116,9 @@ namespace network::platform::lwip {
 
     // Implementation of internal callbacks
     namespace {
+        // Forward declaration
+        err_t OnHttpSent(void* arg, tcp_pcb* pcb, u16_t len);
+
         err_t OnHttpAccept(void* /*arg*/, tcp_pcb* client_pcb, err_t err) {
             if (err != ERR_OK || !client_pcb) {
                 return ERR_VAL;
@@ -130,11 +136,13 @@ namespace network::platform::lwip {
             conn->tcp_handle = static_cast<TcpHandle>(client_pcb);
             conn->request_length = 0;
             conn->response_length = 0;
+            conn->response_sent = 0;
 
             // Set up LWIP callbacks with connection as argument
             tcp_arg(client_pcb, conn);
             tcp_recv(client_pcb, OnHttpReceive);
             tcp_err(client_pcb, OnHttpError);
+            tcp_sent(client_pcb, OnHttpSent);
 
             return ERR_OK;
         }
@@ -179,16 +187,43 @@ namespace network::platform::lwip {
 
                         // Send the response if any was generated
                         if (c->response_length > 0) {
-                            std::span<const char> data(c->response_buffer.data(), c->response_length);
-                            auto result = Send(c->tcp_handle, data);
-                            if (!result) {
-                                printf("HTTP: Send failed\n");
-                            }
-                        }
+                            size_t available = tcp_sndbuf(pcb);
+                            printf("HTTP: Response ready: %zu bytes, buffer available: %zu\n",
+                                   c->response_length, available);
 
-                        // Close connection after response
-                        ReleaseConnection(c);
-                        tcp_close(pcb);
+                            if (available == 0) {
+                                printf("HTTP: No buffer space, will wait for callback\n");
+                                c->response_sent = 0;
+                                // tcp_sent callback will handle sending when space is available
+                                return ERR_OK;
+                            }
+
+                            size_t to_send = (c->response_length < available) ? c->response_length : available;
+
+                            err_t send_err = tcp_write(pcb, c->response_buffer.data(), to_send, TCP_WRITE_FLAG_COPY);
+                            if (send_err == ERR_OK) {
+                                c->response_sent = to_send;
+                                tcp_output(pcb);
+                                printf("HTTP: Sent %zu/%zu bytes (callback will handle rest)\n",
+                                       to_send, c->response_length);
+
+                                // If all data sent, close immediately
+                                if (c->response_sent >= c->response_length) {
+                                    ReleaseConnection(c);
+                                    tcp_close(pcb);
+                                }
+                                // Otherwise, tcp_sent callback will handle the rest
+                            } else {
+                                printf("HTTP: Initial send failed with error %d (available was %zu, tried %zu)\n",
+                                       send_err, available, to_send);
+                                ReleaseConnection(c);
+                                tcp_close(pcb);
+                            }
+                        } else {
+                            // No response, just close
+                            ReleaseConnection(c);
+                            tcp_close(pcb);
+                        }
                         return ERR_OK;
                     }
                 }
@@ -202,6 +237,52 @@ namespace network::platform::lwip {
             if (c) {
                 ReleaseConnection(c);
             }
+        }
+
+        err_t OnHttpSent(void* arg, tcp_pcb* pcb, u16_t len) {
+            Connection* c = static_cast<Connection*>(arg);
+            if (!c) {
+                return ERR_OK;
+            }
+
+            printf("HTTP: Sent callback - %u bytes acknowledged\n", len);
+
+            // Check if there's more data to send
+            if (c->response_sent < c->response_length) {
+                size_t remaining = c->response_length - c->response_sent;
+                size_t available = tcp_sndbuf(pcb);
+                size_t to_send = (remaining < available) ? remaining : available;
+
+                printf("HTTP: Sending next chunk: %zu bytes (sent so far: %zu/%zu)\n",
+                       to_send, c->response_sent, c->response_length);
+
+                if (to_send > 0) {
+                    err_t err = tcp_write(pcb, c->response_buffer.data() + c->response_sent,
+                                         to_send, TCP_WRITE_FLAG_COPY);
+                    if (err == ERR_OK) {
+                        c->response_sent += to_send;
+                        tcp_output(pcb);
+
+                        // If all done, close connection
+                        if (c->response_sent >= c->response_length) {
+                            printf("HTTP: All data sent, closing connection\n");
+                            ReleaseConnection(c);
+                            tcp_close(pcb);
+                        }
+                    } else {
+                        printf("HTTP: Follow-up send failed with error %d\n", err);
+                        ReleaseConnection(c);
+                        tcp_close(pcb);
+                    }
+                }
+            } else {
+                // All data sent, close connection
+                printf("HTTP: All data confirmed sent, closing\n");
+                ReleaseConnection(c);
+                tcp_close(pcb);
+            }
+
+            return ERR_OK;
         }
     }
 
