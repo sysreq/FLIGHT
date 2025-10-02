@@ -3,26 +3,28 @@
 #include "platform/lwip_wrapper.h"
 #include "services/service_manager.h"
 #include "services/http_service.h"
+#include "services/dhcp_service.h"
+#include "services/dns_service.h"
 #include "handlers/shared_state.h"
+#include "lwip/ip_addr.h"
+#include "lwip/netif.h"
 #include <cstdio>
 #include <cstring>
 
 namespace network {
     namespace detail {
+        // Network configuration constants
+        constexpr uint8_t AP_IP_ADDR[4] = {192, 168, 4, 1};
+        constexpr uint8_t AP_NETMASK[4] = {255, 255, 255, 0};
+        constexpr uint8_t AP_GATEWAY[4] = {192, 168, 4, 1};
+
         // Internal state
         static bool g_initialized = false;
-        static services::ServiceManager<services::HttpService> g_service_manager;
+        static services::ServiceManager<services::HttpService, services::DhcpService, services::DnsService> g_service_manager;
 
         // WiFi credentials
         static char g_wifi_ssid[32] = "";
         static char g_wifi_password[64] = "";
-
-        // Timer callback
-        static bool TimerCallback(void* /*user_data*/) {
-            platform::lwip::Poll();
-            g_service_manager.ProcessAll();
-            return true;  // Keep timer running
-        }
     }
 
     bool Start() {
@@ -36,16 +38,30 @@ namespace network {
         // Note: WiFi/CYW43 must be initialized externally before calling Start()
         // This allows the caller to configure AP or STA mode as needed
 
+        // Auto-configure DHCP and DNS services if netif is available
+        if (netif_default != nullptr) {
+            const ip4_addr_t* ip_ptr = netif_ip_addr4(netif_default);
+            const ip4_addr_t* mask_ptr = netif_ip_netmask4(netif_default);
+
+            if (ip_ptr != nullptr && mask_ptr != nullptr) {
+                ip_addr_t router_ip;
+                ip_addr_t netmask;
+                ip_addr_copy_from_ip4(router_ip, *ip_ptr);
+                ip_addr_copy_from_ip4(netmask, *mask_ptr);
+
+                // Configure DHCP service
+                auto& dhcp = std::get<1>(detail::g_service_manager.GetServices());
+                dhcp.Configure(&router_ip, &netmask);
+
+                // Configure DNS service
+                auto& dns = std::get<2>(detail::g_service_manager.GetServices());
+                dns.Configure(&router_ip);
+            }
+        }
+
         // Start services
         if (!detail::g_service_manager.StartAll()) {
             printf("Network: Service start failed\n");
-            return false;
-        }
-
-        // Start timer (10ms interval)
-        if (!platform::pico::StartTimer(detail::TimerCallback, nullptr, 10)) {
-            printf("Network: Timer start failed\n");
-            detail::g_service_manager.StopAll();
             return false;
         }
 
@@ -61,7 +77,6 @@ namespace network {
 
         printf("Network: Stopping...\n");
 
-        platform::pico::StopTimer();
         detail::g_service_manager.StopAll();
         // Note: WiFi/CYW43 deinit is handled externally
         detail::g_initialized = false;
@@ -71,6 +86,12 @@ namespace network {
 
     bool IsInitialized() {
         return detail::g_initialized;
+    }
+
+    void Process() {
+        if (detail::g_initialized) {
+            detail::g_service_manager.ProcessAll();
+        }
     }
 
     namespace WiFi {

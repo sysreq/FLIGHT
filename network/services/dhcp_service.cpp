@@ -125,7 +125,14 @@ void DhcpService::ProcessRequest(pbuf* p, const ip_addr_t* /*src_addr*/, u16_t /
 
     // Prepare response
     dhcp_msg.op = 2;  // BOOTREPLY
-    std::memcpy(&dhcp_msg.yiaddr, &ip4_addr_get_u32(ip_2_ip4(&router_ip_)), 4);
+
+    // Copy router IP as base for yiaddr (we'll modify the last octet later)
+    // lwIP stores IP in network byte order (big-endian)
+    uint32_t base_ip = lwip_ntohl(ip4_addr_get_u32(ip_2_ip4(&router_ip_)));
+    dhcp_msg.yiaddr[0] = (base_ip >> 24) & 0xff;  // Most significant byte
+    dhcp_msg.yiaddr[1] = (base_ip >> 16) & 0xff;
+    dhcp_msg.yiaddr[2] = (base_ip >> 8) & 0xff;
+    dhcp_msg.yiaddr[3] = (base_ip >> 0) & 0xff;   // Least significant byte
 
     uint8_t* opt = dhcp_msg.options + 4;  // Skip magic cookie
     const uint8_t* msgtype = FindOption(opt, DHCP_OPT_MSG_TYPE);
@@ -140,7 +147,6 @@ void DhcpService::ProcessRequest(pbuf* p, const ip_addr_t* /*src_addr*/, u16_t /
         case DHCPDISCOVER: {
             int yi = FindLeaseSlot(dhcp_msg.chaddr);
             if (yi == DHCP_MAX_CLIENTS) {
-                printf("DHCP: No IP addresses available\n");
                 return;
             }
 

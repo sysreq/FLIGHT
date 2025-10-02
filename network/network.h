@@ -11,6 +11,9 @@ namespace network {
     // Check if network is initialized
     bool IsInitialized();
 
+    // Process network services (call periodically from main loop)
+    void Process();
+
     // WiFi Configuration API
     namespace WiFi {
         // Set WiFi credentials (must be called before Start())

@@ -29,6 +29,11 @@ namespace network::services {
             }, m_services);
         }
 
+        // Access to underlying services tuple for configuration
+        std::tuple<Services...>& GetServices() {
+            return m_services;
+        }
+
     private:
         std::tuple<Services...> m_services;
     };

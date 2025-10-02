@@ -2,16 +2,9 @@
 #include "../network.h"  // For ConnectionStatus enum
 #include "pico/stdlib.h"
 #include "pico/cyw43_arch.h"
-#include "hardware/timer.h"
 #include "lwip/netif.h"
 
 namespace network::platform::pico {
-    namespace detail {
-        // Static timer handle
-        static repeating_timer_t g_timer{};
-        static bool g_timer_active = false;
-    }
-
     std::expected<void, ErrorCode> InitWiFi() {
         // Initialize WiFi in polling mode
         if (cyw43_arch_init()) {
@@ -27,38 +20,6 @@ namespace network::platform::pico {
 
     void DeinitWiFi() {
         cyw43_arch_deinit();
-    }
-
-    bool StartTimer(bool (*callback)(void*), void* user_data, uint32_t interval_ms) {
-        if (!callback) {
-            return false;
-        }
-
-        if (detail::g_timer_active) {
-            // Timer already running
-            return false;
-        }
-
-        // Convert milliseconds to microseconds (negative for repeating timer)
-        int64_t interval_us = -static_cast<int64_t>(interval_ms * 1000);
-
-        bool success = add_repeating_timer_us(interval_us,
-            reinterpret_cast<repeating_timer_callback_t>(callback),
-            user_data,
-            &detail::g_timer);
-
-        if (success) {
-            detail::g_timer_active = true;
-        }
-
-        return success;
-    }
-
-    void StopTimer() {
-        if (detail::g_timer_active) {
-            cancel_repeating_timer(&detail::g_timer);
-            detail::g_timer_active = false;
-        }
     }
 
     network::WiFi::ConnectionStatus GetWiFiStatus() {

@@ -12,9 +12,6 @@ namespace network::platform::pico {
     std::expected<void, ErrorCode> InitWiFi();
     void DeinitWiFi();
 
-    bool StartTimer(bool (*callback)(void*), void* user_data, uint32_t interval_ms);
-    void StopTimer();
-
     // WiFi status functions
     network::WiFi::ConnectionStatus GetWiFiStatus();
     uint32_t GetIpAddress();  // Returns IP in network byte order

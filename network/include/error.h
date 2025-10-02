@@ -1,6 +1,8 @@
 #pragma once
-#include <cstdint>
+
 #include <array>
+#include <cstdint>
+#include <cstddef>
 
 namespace network {
     #define ERROR_CODE_LIST(X)  \
