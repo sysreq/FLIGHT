@@ -4,7 +4,10 @@
       "Bash(tree:*)",
       "Bash(cmake:*)",
       "Bash(dir build)",
-      "Bash(cat:*)"
+      "Bash(cat:*)",
+      "Bash(dir)",
+      "Bash(~/.pico-sdk/ninja/v1.13.1/ninja -C build network)",
+      "Bash(ninja:*)"
     ],
     "deny": [],
     "ask": []

@@ -1,10 +1,10 @@
 #pragma once
-#include "../include/concepts.h"
+#include "../types.h"
 #include <tuple>
 #include <utility>
 
 namespace network::services {
-    template<Service... Services>
+    template<network::Service... Services>
     class ServiceManager {
     public:
         ServiceManager() = default;

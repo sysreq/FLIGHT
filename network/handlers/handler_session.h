@@ -1,5 +1,5 @@
 #pragma once
-#include "../platform/config.h"
+#include "../platform/connection.h"
 
 namespace network::handlers {
     void HandleSessionStart(platform::Connection& conn);

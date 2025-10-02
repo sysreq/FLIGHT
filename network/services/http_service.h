@@ -1,8 +1,6 @@
 #pragma once
 #include "../platform/lwip_wrapper.h"
-#include "../platform/config.h"
-#include "../include/types.h"
-#include "config.h"
+#include "../types.h"
 
 namespace network::services {
     class HttpService {

@@ -1,9 +1,8 @@
 add_library(network
     network.cpp
-    platform/config.cpp
+    platform/connection.cpp
     platform/lwip_wrapper.cpp
     platform/pico_wrapper.cpp
-    services/service_manager.cpp
     services/http_service.cpp
     services/dhcp_service.cpp
     services/dns_service.cpp

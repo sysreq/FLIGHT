@@ -1,6 +1,5 @@
 #include "dispatcher.h"
-#include <cstring>
-#include <cstdio>
+#include "response_helpers.h"
 
 namespace network::handlers {
     void HandleIndex(platform::Connection& conn) {
@@ -109,32 +108,6 @@ namespace network::handlers {
             "setInterval(()=>{if(!sessionActive)pollSensors();},10000);"
             "</script></body></html>";
 
-        size_t body_len = strlen(html);
-        char header[256];
-        int header_len = snprintf(header, sizeof(header),
-            "HTTP/1.1 200 OK\r\n"
-            "Content-Type: text/html; charset=utf-8\r\n"
-            "Content-Length: %zu\r\n"
-            "\r\n",
-            body_len);
-
-        if (header_len < 0 || static_cast<size_t>(header_len) >= sizeof(header)) {
-            printf("Index: Header generation failed\n");
-            return;
-        }
-
-        size_t total_len = header_len + body_len;
-        printf("Index: HTML size=%zu, Header size=%d, Total=%zu, Buffer size=%zu\n",
-               body_len, header_len, total_len, conn.response_buffer.size());
-
-        if (total_len > conn.response_buffer.size()) {
-            printf("Index: Response too large for buffer!\n");
-            return;
-        }
-
-        std::memcpy(conn.response_buffer.data(), header, header_len);
-        std::memcpy(conn.response_buffer.data() + header_len, html, body_len);
-        conn.response_length = total_len;
-        printf("Index: Response prepared, length=%zu\n", total_len);
+        SendHtmlResponse(conn, html);
     }
 }

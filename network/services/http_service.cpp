@@ -6,6 +6,10 @@
 #include <string_view>
 
 namespace network::services {
+    // HTTP configuration constants
+    inline constexpr uint16_t HTTP_PORT = 80;
+    inline constexpr size_t MAX_REQUEST_LINE_LENGTH = 512;
+    inline constexpr size_t MAX_HEADER_COUNT = 16;
     bool HttpService::Start() {
         auto result = platform::lwip::CreateListener(HTTP_PORT);
         if (!result) {
@@ -15,10 +19,7 @@ namespace network::services {
         }
 
         m_listener = result.value();
-
-        // Setup HTTP handling callbacks
         platform::lwip::SetupHttpListener(m_listener);
-
         printf("HTTP: Service started on port %u\n", HTTP_PORT);
         return true;
     }
@@ -28,11 +29,11 @@ namespace network::services {
             platform::lwip::DestroyListener(m_listener);
             m_listener = nullptr;
 
-            // Close all active connections
-            for (auto& conn : platform::g_connection_pool) {
-                if (conn.in_use && conn.tcp_handle) {
-                    platform::lwip::CloseConnection(conn.tcp_handle);
-                    platform::ReleaseConnection(&conn);
+            for (size_t i = 0; i < platform::Connection::GetPoolSize(); ++i) {
+                auto& conn = platform::Connection::GetPool()[i];
+                if (conn.IsInUse() && conn.GetTcpHandle()) {
+                    platform::lwip::CloseConnection(conn.GetTcpHandle());
+                    platform::Connection::Release(&conn);
                 }
             }
 
@@ -41,40 +42,24 @@ namespace network::services {
     }
 
     void HttpService::Process() {
-        // LWIP handles everything via callbacks, nothing to do here
-        // This function exists to satisfy the Service concept
     }
 
     void HttpService::AcceptNewConnections() {
-        // Handled by LWIP callbacks in lwip_wrapper.cpp
     }
 
     void HttpService::ProcessActiveConnections() {
-        // Handled by LWIP callbacks in lwip_wrapper.cpp
     }
 
     void HttpService::ParseRequest(platform::Connection& conn) {
-        // Extract method, path, and version from first line
-        // Format: "GET /path HTTP/1.1\r\n"
+        const char* buf = conn.GetRequestBuffer();
+        size_t len = conn.GetRequestLength();
 
-        const char* buf = conn.request_buffer.data();
-        size_t len = conn.request_length;
+        if (len == 0) return;
 
-        if (len == 0) {
-            return;
-        }
-
-        // Find first space (after method)
         const char* method_end = static_cast<const char*>(memchr(buf, ' ', len));
-        if (!method_end) {
-            return;
-        }
+        if (!method_end) return;
 
-        // Extract method as string_view
-        size_t method_len = method_end - buf;
-        std::string_view method(buf, method_len);
-
-        // Validate HTTP method
+        std::string_view method(buf, method_end - buf);
         HttpMethod http_method;
         if (method == "GET") {
             http_method = HttpMethod::GET;
@@ -91,38 +76,33 @@ namespace network::services {
         } else if (method == "OPTIONS") {
             http_method = HttpMethod::OPTIONS;
         } else {
-            // Unsupported method - send 405 Method Not Allowed
             SendMethodNotAllowed(conn);
             return;
         }
 
-        // Find second space (after path)
         size_t remaining = len - (method_end - buf + 1);
         const char* path_start = method_end + 1;
         const char* path_end = static_cast<const char*>(memchr(path_start, ' ', remaining));
-        if (!path_end) {
+        if (!path_end) return;
+
+        size_t path_len = path_end - path_start;
+        if (path_len > platform::MAX_HTTP_PATH_LENGTH) {
+            SendBadRequest(conn);
             return;
         }
-
-        // Extract path as string_view
-        size_t path_len = path_end - path_start;
         std::string_view path(path_start, path_len);
 
-        // Extract HTTP version
         const char* version_start = path_end + 1;
         const char* line_end = static_cast<const char*>(memchr(version_start, '\r',
                                                                 remaining - (version_start - path_start)));
         if (line_end) {
             std::string_view version(version_start, line_end - version_start);
-
-            // Validate HTTP version
             if (version != "HTTP/1.0" && version != "HTTP/1.1") {
                 SendBadRequest(conn);
                 return;
             }
         }
 
-        // Dispatch to handler (now supports both GET and POST)
         handlers::Dispatch(conn, path, http_method);
     }
 
@@ -131,15 +111,10 @@ namespace network::services {
             "HTTP/1.1 405 Method Not Allowed\r\n"
             "Content-Type: text/plain\r\n"
             "Content-Length: 18\r\n"
-            "Allow: GET\r\n"
+            "Allow: GET, POST, DELETE\r\n"
             "\r\n"
             "Method Not Allowed";
-
-        size_t len = strlen(response);
-        if (len <= conn.response_buffer.size()) {
-            std::memcpy(conn.response_buffer.data(), response, len);
-            conn.response_length = len;
-        }
+        conn.SafeWriteResponse(response, strlen(response));
     }
 
     void HttpService::SendBadRequest(platform::Connection& conn) {
@@ -149,28 +124,7 @@ namespace network::services {
             "Content-Length: 11\r\n"
             "\r\n"
             "Bad Request";
-
-        size_t len = strlen(response);
-        if (len <= conn.response_buffer.size()) {
-            std::memcpy(conn.response_buffer.data(), response, len);
-            conn.response_length = len;
-        }
-    }
-
-    void HttpService::SendResponse(platform::Connection& conn) {
-        // Response sending is now handled in lwip_wrapper.cpp
-        // This function is no longer needed but kept for compatibility
-        if (conn.response_length == 0 || !conn.tcp_handle) {
-            return;
-        }
-
-        // Send response via LWIP wrapper
-        std::span<const char> data(conn.response_buffer.data(), conn.response_length);
-        auto result = platform::lwip::Send(conn.tcp_handle, data);
-
-        if (!result) {
-            printf("HTTP: Send failed: %s\n", ErrorCodeToString(result.error()));
-        }
+        conn.SafeWriteResponse(response, strlen(response));
     }
 
     // Static helper for callback use

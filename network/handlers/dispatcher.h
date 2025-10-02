@@ -1,6 +1,6 @@
 #pragma once
-#include "../platform/config.h"
-#include "../include/types.h"
+#include "../platform/connection.h"
+#include "../types.h"
 #include <array>
 #include <string_view>
 
