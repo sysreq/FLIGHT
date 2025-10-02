@@ -1,6 +1,5 @@
 add_library(network
     network.cpp
-    include/error.cpp
     platform/config.cpp
     platform/lwip_wrapper.cpp
     platform/pico_wrapper.cpp
