@@ -24,26 +24,13 @@ if (EXISTS ${picoVscode})
     include(${picoVscode})
 endif()
 # ====================================================================================
-set(PICO_BOARD pico2_w CACHE STRING "Board type")
+set(PICO_BOARD pico2 CACHE STRING "Board type")
 include(pico_sdk_import.cmake)
 
 project(FLIGHT C CXX ASM)
 
 pico_sdk_init()
-add_executable(FLIGHT main.cpp
-    app/core0.cpp
-    app/core1.cpp
-    sdcard/sd_driver.cpp
-    storage/storage_impl.cpp
-    http/servers/dns_server.cpp
-    http/servers/dhcp_server.cpp
-    http/servers/http_events.cpp
-    http/servers/http_server.cpp
-    http/servers/http_router.cpp
-    http/servers/http_status.cpp
-    http/ui/http_generator.cpp
-    http/access_point.cpp
-)
+add_executable(FLIGHT main.cpp)
 
 pico_set_program_name(FLIGHT "FLIGHT")
 pico_set_program_version(FLIGHT "0.1")
@@ -52,6 +39,7 @@ pico_enable_stdio_uart(FLIGHT 0)
 pico_enable_stdio_usb(FLIGHT 1)
 
 add_subdirectory(lib)
+add_subdirectory(filesystem)
 
 # Create a bundled interface library for all Pico SDK components
 add_library(pico_bundle INTERFACE)
@@ -62,10 +50,7 @@ target_link_libraries(pico_bundle INTERFACE
     pico_multicore
     pico_bootrom
     pico_sync
-    
-    # WiFi support (if using Pico W)
-    pico_cyw43_arch_lwip_poll
-    
+        
     # Hardware interfaces
     hardware_resets
     hardware_clocks
@@ -86,19 +71,14 @@ target_link_libraries(pico_bundle INTERFACE
 
 target_link_libraries(FLIGHT
     pico_bundle
-    third_party
+    filesystem
 )
 
 # Add the standard include files to the build
 target_include_directories(FLIGHT PRIVATE
         ${CMAKE_CURRENT_LIST_DIR}
-        ${CMAKE_CURRENT_LIST_DIR}/app
         ${CMAKE_CURRENT_LIST_DIR}/i2c
-        ${CMAKE_CURRENT_LIST_DIR}/sdcard
-        ${CMAKE_CURRENT_LIST_DIR}/storage
-        ${CMAKE_CURRENT_LIST_DIR}/http
-        ${CMAKE_CURRENT_LIST_DIR}/http/config
-        ${CMAKE_CURRENT_LIST_DIR}/lib
+        ${CMAKE_CURRENT_LIST_DIR}/filesystem
 )
 
 target_compile_definitions(FLIGHT PRIVATE
