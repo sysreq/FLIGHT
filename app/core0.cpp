@@ -2,7 +2,6 @@
 // ============================================
 #include "pico/stdlib.h"
 // ============================================
-#include "sdcard.h"
 #include "http/access_point.h"
 #include "http/ui/http_generator.h"
 #include "adc/hx711.h"
@@ -25,11 +24,6 @@ bool init() {
     PRINT_BANNER(0, "INITIALIZING CORE 0");
     sleep_ms(10);
     PRINT_BANNER(1, "STARTING FILESYSTEM");
-    // REQUIRE(SDCard::mount(), "ERROR: Failed to mount SDCard\n");
-    // REQUIRE(SDFile<LogFile>::Open(), "ERROR: Failed to open LogFile\n");
-    // REQUIRE(SDFile<TelemetryFile>::Open(), "ERROR: Failed to open TelemetryFile\n");
-    // REQUIRE(SDFile<SpeedFile>::Open(), "ERROR: Failed to open SpeedFile\n");
-    // REQUIRE(SDFile<HX711DataLog>::Open(), "ERROR: Failed to open HX711DataLog\n");
     PRINT_BANNER(1, "FILESYSTEM ONLINE");
     PRINT_BANNER(1, "STARTING LOAD CELL");
     loadcell = new adc::HX711();
