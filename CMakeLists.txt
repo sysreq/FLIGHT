@@ -31,7 +31,6 @@ project(FLIGHT C CXX ASM)
 
 pico_sdk_init()
 add_executable(FLIGHT main.cpp 
-    storage/storage_impl.cpp
     http/servers/dns_server.cpp
     http/servers/dhcp_server.cpp
     http/servers/http_events.cpp
@@ -91,16 +90,10 @@ target_include_directories(FLIGHT PRIVATE
         ${CMAKE_CURRENT_LIST_DIR}
         ${CMAKE_CURRENT_LIST_DIR}/i2c
         ${CMAKE_CURRENT_LIST_DIR}/sdcard
-        ${CMAKE_CURRENT_LIST_DIR}/storage
         ${CMAKE_CURRENT_LIST_DIR}/http
         ${CMAKE_CURRENT_LIST_DIR}/http/config
         ${CMAKE_CURRENT_LIST_DIR}/lib
 )
-
-target_compile_definitions(FLIGHT PRIVATE
-    PICO_STACK_SIZE=0x800
-)
-
 
 # Linker options
 target_link_options(${PROJECT_NAME} PRIVATE
