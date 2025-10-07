@@ -2,7 +2,6 @@
 
 #include <cstdint>
 #include <cstdio>
-#include <functional>
 #include "hardware/gpio.h"
 #include "pico/time.h"
 #include "hardware/sync.h"
@@ -25,16 +24,13 @@ private:
     static constexpr uint8_t DATA = 6; 
     static constexpr uint8_t SCK = 7;
 
-    static constexpr float _scale_factor = 29007.5f;
-    static constexpr int32_t _tare_offset = -26200; 
+    static constexpr float _scale_factor = 34718.4f;
+    static constexpr int32_t _tare_offset = -100000; 
 
     hx711_data current_data{};
-    repeating_timer_t timer{};
-    std::function<void(const hx711_data&)> callback;
-    uint32_t poll_rate_hz = 10;
-    uint32_t error_count = 0;
     bool initialized = false;
-    bool polling_active = false;
+    static constexpr uint8_t OVERSAMPLE_COUNT = 16;
+    int32_t sample_buffer[OVERSAMPLE_COUNT];
     
     static int32_t convert_to_signed(uint32_t raw) {
         if (raw & 0x800000) {
@@ -44,28 +40,6 @@ private:
     }
 
 public:
-    static bool timer_callback(repeating_timer_t* rt) {
-        auto* self = static_cast<HX711*>(rt->user_data);
-        return self->handle_timer();
-    }
-    
-    bool handle_timer() {
-        if (update()) {
-            error_count = 0;
-            if (callback) {
-                callback(current_data);
-            }
-        } else {
-            error_count++;
-            if (error_count > 10) {
-                printf("HX711: Too many errors (%u), stopping timer\n", error_count);
-                polling_active = false;
-                return false;
-            }
-        }
-        return true;
-    }
-    
     bool read_raw(int32_t& value) {
         uint32_t timeout = 0;
         while (gpio_get(DATA)) {
@@ -105,13 +79,7 @@ public:
         return true;
     }
 
-    HX711() {
-        memset(&timer, 0, sizeof(repeating_timer_t));
-    }
-    
-    ~HX711() {
-        stop();
-    }
+    HX711() = default;
     
     bool init() {
         if (initialized) {
@@ -139,64 +107,46 @@ public:
         return true;
     }
     
-    bool update() {
-        if (!initialized) return false;
-        
-        int32_t raw;
-        if (!read_raw(raw)) {
+    void update(uint16_t samples = OVERSAMPLE_COUNT) {
+        if (!initialized) {
             current_data.valid = false;
-            return false;
+            return;
         }
-        
+
+        // Collect samples
+        int error_count = 0;
+        int success_count = 0;
+        while (success_count < OVERSAMPLE_COUNT) {
+            if (!read_raw(sample_buffer[success_count])) {
+                if(++error_count < OVERSAMPLE_COUNT)
+                {
+                        printf("HX711 failed to gather data.\n");
+                        current_data.valid = false;
+                        return;  
+                }
+                continue;
+            }
+            success_count++;
+        }
+
+        // Average the samples
+        int64_t sum = 0;
+        for (uint8_t i = 0; i < samples; i++) {
+            sum += sample_buffer[i];
+        }
+        int32_t raw = sum / samples;
+
         current_data.raw_value = raw;
         current_data.tared_value = raw + _tare_offset;
         current_data.weight = static_cast<float>(raw) / _scale_factor;
         current_data.valid = true;
-        
-        return true;
     }
     
-    bool start(std::function<void(const hx711_data&)> handler, uint32_t rate_hz = 10) {
-        if (!initialized) {
-            if (!init()) {
-                return false;
-            }
-        }
-        
-        if (polling_active) {
-            return true;
-        }
-        
-        callback = handler;
-        poll_rate_hz = rate_hz;
-        error_count = 0;
-        
-        int64_t interval_us = -static_cast<int64_t>(1000000 / poll_rate_hz);
-        polling_active = add_repeating_timer_us(interval_us, timer_callback, this, &timer);
-        
-        if (polling_active) {
-            printf("HX711: Started polling at %u Hz\n", poll_rate_hz);
-        }
-        
-        return polling_active;
-    }
-    
-    void stop() {
-        if (polling_active) {
-            cancel_repeating_timer(&timer);
-            polling_active = false;
-            
-            if (initialized) {
-                gpio_put(SCK, true);
-                sleep_us(70);
-            }
-            
-            printf("HX711: Stopped polling\n");
-        }
-    }
-    
-    hx711_data get_data() const { return current_data; }
-    bool is_active() const { return polling_active; }
+    const hx711_data& data() const { return current_data; }
+    int32_t raw() const { return current_data.raw_value; }
+    int32_t tared() const { return current_data.tared_value; }
+    float weight() const { return current_data.weight; }
+    bool valid() const { return current_data.valid; }
 };
 
 } // namespace drivers

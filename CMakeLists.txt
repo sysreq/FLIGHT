@@ -30,16 +30,10 @@ include(pico_sdk_import.cmake)
 project(FLIGHT C CXX ASM)
 
 pico_sdk_init()
-add_executable(FLIGHT main.cpp 
-    http/servers/dns_server.cpp
-    http/servers/dhcp_server.cpp
-    http/servers/http_events.cpp
-    http/servers/http_server.cpp
-    http/servers/http_router.cpp
-    http/servers/http_status.cpp
-    http/ui/http_generator.cpp
-    http/access_point.cpp
-)
+
+add_subdirectory(network)
+
+add_executable(FLIGHT main.cpp)
 
 pico_set_program_name(FLIGHT "FLIGHT")
 pico_set_program_version(FLIGHT "0.1")
@@ -83,6 +77,7 @@ target_link_libraries(pico_bundle INTERFACE
 target_link_libraries(FLIGHT
     pico_bundle
     third_party
+    network
 )
 
 # Add the standard include files to the build
@@ -90,9 +85,8 @@ target_include_directories(FLIGHT PRIVATE
         ${CMAKE_CURRENT_LIST_DIR}
         ${CMAKE_CURRENT_LIST_DIR}/i2c
         ${CMAKE_CURRENT_LIST_DIR}/sdcard
-        ${CMAKE_CURRENT_LIST_DIR}/http
-        ${CMAKE_CURRENT_LIST_DIR}/http/config
         ${CMAKE_CURRENT_LIST_DIR}/lib
+        ${CMAKE_CURRENT_LIST_DIR}/network/platform
 )
 
 # Linker options

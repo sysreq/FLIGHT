@@ -1,150 +1,134 @@
-#pragma once
-
-#include <cstdint>
 #include <cstdio>
-#include <cstring>
-#include <functional>
-#include "hardware/adc.h"
-#include "pico/time.h"
+#include <pico/stdio.h>
+#include <pico/time.h>
+#include <pico/sync.h>
+#include <hardware/gpio.h>
+#include <hardware/i2c.h>
 
-namespace adc {
+#define ADS1115_ADDR 0x48
+#define ADS1115_REG_CONFIG 0x01
+#define ADS1115_REG_CONVERSION 0x00
 
-struct acs770_data {
-    float current_a;
-    float voltage_v;
-};
+int16_t ads1115_read_differential(i2c_inst_t* i2c) {
+    // Config: single-shot, AIN0-AIN1 differential, ±2.048V, 64SPS
+    uint16_t config = 0x8000 |  // Start single conversion + single-shot mode
+                      0x0000 |  // AIN0-AIN1 differential (000)
+                      0x0400 |  // ±2.048V range (010)
+                      0x0100 |  // Single-shot mode
+                      0x0060 |  // 64 SPS
+                      0x0003;   // Disable comparator
 
-class ACS770 {
-private:
-    static constexpr float SENSITIVITY_MV_PER_A = 7.830445f;
-    static constexpr float ZERO_CURRENT_V = 0.330f;
-    static constexpr float VCC = 3.3f;
-    static constexpr float VOLTAGE_DIVIDER_RATIO = 18.94141f;
-    
-    static constexpr uint8_t CURRENT_CHANNEL = 0;
-    static constexpr uint8_t VOLTAGE_CHANNEL = 1;
-    
-    acs770_data current_data{};
-    repeating_timer_t timer{};
-    std::function<void(const acs770_data&)> callback;
-    float zero_offset = ZERO_CURRENT_V * 1000.0f;
-    uint32_t poll_rate_hz = 50;
-    uint32_t error_count = 0;
-    bool initialized = false;
-    bool polling_active = false;
-    
-    static bool timer_callback(repeating_timer_t* rt) {
-        auto* self = static_cast<ACS770*>(rt->user_data);
-        return self->handle_timer();
-    }
-    
-    bool handle_timer() {
-        if (update()) {
-            error_count = 0;
-            if (callback) {
-                callback(current_data);
-            }
-        } else {
-            error_count++;
-            if (error_count > 10) {
-                printf("ACS770: Too many errors (%u), stopping timer\n", error_count);
-                polling_active = false;
-                return false;
-            }
-        }
-        return true;
-    }
-    
-    uint32_t read_oversampled(uint8_t channel, uint8_t samples = 32) {
-        adc_select_input(channel);
-        uint32_t sum = 0;
-        for (uint8_t i = 0; i < samples; i++) {
-            sum += adc_read();
-        }
-        return static_cast<uint32_t>(sum / samples);
+    uint8_t config_data[3] = {ADS1115_REG_CONFIG, (uint8_t)(config >> 8), (uint8_t)(config & 0xFF)};
+
+    int result = -1;
+    for(int i = 0; i < 3; i++)
+    {
+        result = i2c_write_blocking(i2c, ADS1115_ADDR, config_data, 3, false);
+        if(result >= 0)
+            break;
+
     }
 
-public:
-    ACS770() {
-        memset(&timer, 0, sizeof(repeating_timer_t));
+    if (result < 0) {
+        printf("I2C write failed: %d\n", result);
+        return 0;
     }
-    
-    ~ACS770() {
-        stop_polling();
-    }
-    
-    bool init() {
-        // Initialize ADC hardware
-        static bool adc_initialized = false;
-        if (!adc_initialized) {
-            adc_init();
-            adc_gpio_init(26);
-            adc_gpio_init(27);
-            adc_initialized = true;
-        }
-        
-        initialized = true;
-        printf("ACS770: Initialized (sensitivity: %.3f mV/A)\n", SENSITIVITY_MV_PER_A);
-        printf("ACS770: Voltage monitoring enabled (divider: %.2f)\n", VOLTAGE_DIVIDER_RATIO);
-        return true;
-    }
-        
-    bool calibrate_zero() {
-        if (!initialized) return false;
-        
-        uint16_t avg = read_oversampled(CURRENT_CHANNEL, 64);
-        zero_offset = (avg * VCC / 4095.0f) * 1000.0f;
-        
-        printf("ACS770: Zero calibrated to %.1f mV\n", zero_offset);
-        return true;
-    }
-    
-    bool update() {
-        if (!initialized) return false;
-        
-        uint32_t current_adc = read_oversampled(CURRENT_CHANNEL);
-        float voltage_mv = (current_adc * VCC / 4095.0f) * 1000.0f;
-        
-        // Calculate current
-        float current = (voltage_mv - zero_offset) / SENSITIVITY_MV_PER_A;
-        if (current < 0.0f) current = 0.0f;
-        
-        current_data.current_a = current;
-        
-        uint32_t voltage_adc = read_oversampled(VOLTAGE_CHANNEL);
-        current_data.voltage_v = (voltage_adc * VCC / 4095.0f) * VOLTAGE_DIVIDER_RATIO;
-        
-        return true;
-    }
-    
-    bool start_polling(std::function<void(const acs770_data&)> handler, uint32_t rate_hz = 50) {
-        if (!initialized || polling_active) {
-            return polling_active;
-        }
-        
-        callback = handler;
-        poll_rate_hz = rate_hz;
-        
-        int64_t interval_us = -static_cast<int64_t>(1000000 / poll_rate_hz);
-        polling_active = add_repeating_timer_us(interval_us, timer_callback, this, &timer);
-        
-        if (polling_active) {
-            printf("ACS770: Started polling at %u Hz\n", poll_rate_hz);
-        }
-        
-        return polling_active;
-    }
-    
-    void stop_polling() {
-        if (polling_active) {
-            cancel_repeating_timer(&timer);
-            polling_active = false;
-            printf("ACS770: Stopped polling\n");
-        }
-    }
-    
-    acs770_data get_data() const { return current_data; }
-    bool is_active() const { return polling_active; }
-};
 
-} // adc namespace
+    sleep_ms(20);  // Wait for conversion (64 SPS = ~15.6ms)
+
+    uint8_t reg = ADS1115_REG_CONVERSION;
+    i2c_write_blocking(i2c, ADS1115_ADDR, &reg, 1, true);
+
+    uint8_t data[2];
+    result = i2c_read_blocking(i2c, ADS1115_ADDR, data, 2, false);
+    if (result < 0) {
+        printf("I2C read failed: %d\n", result);
+        return 0;
+    }
+
+    return (int16_t)((data[0] << 8) | data[1]);
+}
+
+int16_t ads1115_read_a2(i2c_inst_t* i2c) {
+    // Config: single-shot, AIN2 single-ended, ±2.048V, 64SPS
+    uint16_t config = 0x8000 |  // Start single conversion + single-shot mode
+                      0x6000 |  // AIN2 single-ended (110)
+                      0x0400 |  // ±2.048V range (010)
+                      0x0100 |  // Single-shot mode
+                      0x0060 |  // 64 SPS
+                      0x0003;   // Disable comparator
+
+    uint8_t config_data[3] = {ADS1115_REG_CONFIG, (uint8_t)(config >>
+8), (uint8_t)(config & 0xFF)};
+    int result = i2c_write_blocking(i2c, ADS1115_ADDR, config_data, 3, false);
+    if (result < 0) {
+        printf("I2C write failed: %d\n", result);
+        return 0;
+    }
+
+    sleep_ms(20);  // Wait for conversion (64 SPS = ~15.6ms)
+
+    uint8_t reg = ADS1115_REG_CONVERSION;
+    i2c_write_blocking(i2c, ADS1115_ADDR, &reg, 1, true);
+
+    uint8_t data[2];
+    result = i2c_read_blocking(i2c, ADS1115_ADDR, data, 2, false);
+    if (result < 0) {
+        printf("I2C read failed: %d\n", result);
+        return 0;
+    }
+
+    return (int16_t)((data[0] << 8) | data[1]);
+}
+
+// int main() {
+//     stdio_init_all();
+//     sleep_ms(2000);  // Wait for serial to initialize
+//     printf("Hello.\n");
+//     // Setup I2C on GPIO 3 (SDA) and GPIO 4 (SCL)
+//     i2c_init(i2c0, 100000);
+//     gpio_set_function(4, GPIO_FUNC_I2C);
+//     gpio_set_function(5, GPIO_FUNC_I2C);
+//     gpio_pull_up(4);
+//     gpio_pull_up(5);
+
+//     sleep_ms(1000);
+
+//     // Scan I2C bus
+//     printf("Scanning I2C bus...\n");
+//     bool found = false;
+//     for (uint8_t addr = 0x08; addr < 0x78; addr++) {
+//         uint8_t test_data = 0;
+//         if (i2c_read_blocking(i2c0, addr, &test_data, 1, false) !=
+// PICO_ERROR_GENERIC) {
+//             printf("  Found device at 0x%02X\n", addr);
+//             found = true;
+//         }
+//     }
+//     if (!found) {
+//         printf("No I2C devices found! Check wiring.\n");
+//         sleep_ms(500);
+//         return 1;
+//     }
+
+//     printf("\nADS1115 Ready. Using A0-A1 differential mode with 1.65V ref on A1.\n");
+
+//     int8_t direction = 1;
+
+//     while (true) {
+//         int16_t adc_raw = ads1115_read_differential(i2c0);
+//         float voltage = (adc_raw * 2.048f) / 32768.0f;
+//         voltage += 1.65625f;
+//         float current = voltage * 78.30445f;
+
+//         int16_t adc_a2 = ads1115_read_a2(i2c0);
+//         float voltage_a2 = (adc_a2 * 2.048f) / 32768.0f;
+//         voltage_a2 *= 18.94141f;
+
+//         // Print at 10Hz
+//         printf("Amps: %.3fA [ADC: %d (%.3fV)] | Volts: %.3fV (ADC: %d)\n", current, adc_raw, voltage, voltage_a2, adc_a2);
+//         sleep_ms(80);  // 10Hz
+//     }
+
+//     return 0;
+// }

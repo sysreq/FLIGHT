@@ -9,20 +9,16 @@
 #ifndef LWIP_SOCKET
 #define LWIP_SOCKET                 0
 #endif
-#if PICO_CYW43_ARCH_POLL
-#define MEM_LIBC_MALLOC             1
-#else
-// MEM_LIBC_MALLOC is incompatible with non polling versions
+// Force static allocation per spec - no dynamic allocation allowed
 #define MEM_LIBC_MALLOC             0
-#endif
 #define MEM_ALIGNMENT               4
 #ifndef MEM_SIZE
-#define MEM_SIZE                    4000
+#define MEM_SIZE                    16000  // Increased from 4000 to 16KB for larger HTTP responses
 #endif
-#define MEMP_NUM_TCP_SEG            32
+#define MEMP_NUM_TCP_SEG            64     // Increased from 32 to handle more segments
 #define MEMP_NUM_ARP_QUEUE          10
 #define MEMP_NUM_TCP_PCB            10
-#define PBUF_POOL_SIZE              24
+#define PBUF_POOL_SIZE              48     // Increased from 24 to handle larger payloads
 #define LWIP_ARP                    1
 #define LWIP_ETHERNET               1
 #define LWIP_ICMP                   1

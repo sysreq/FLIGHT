@@ -1,5 +1,7 @@
 #pragma once
 
+#include "pico/mutex.h"
+
 #include "sd_config.h"
 #include "sd_driver.h"
 #include "sd_filesystem.h"
@@ -15,6 +17,8 @@ private:
     static constexpr size_t BUFFER_SIZE = FileTraits<FileType>::buffer_size;
     uint8_t buffer_[BUFFER_SIZE];
     size_t buffer_pos_ = 0;
+
+    mutex_t file_lock;
     
     SDFile() {
         memset(&fil_, 0, sizeof(fil_));
@@ -23,7 +27,7 @@ private:
     
     bool flush_buffer() {
         if (buffer_pos_ == 0) return true;
-        
+
         UINT written;
         FRESULT res = f_write(&fil_, buffer_, buffer_pos_, &written);
         
@@ -90,6 +94,7 @@ public:
     bool write(const char* format, ...) {
         if (!is_open_) return false;
         
+        
         char temp[256];
         va_list args;
         va_start(args, format);
@@ -130,10 +135,8 @@ public:
     
     bool sync() {
         if (!is_open_) return true;
-        
-        if (!flush_buffer()) return false;
-        
-        return (f_sync(&fil_) == FR_OK);
+        if(!flush_buffer()) return false;
+        return f_sync(&fil_) == FR_OK;
     }
         
     static bool Open() { return instance().open(); }

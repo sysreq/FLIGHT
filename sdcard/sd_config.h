@@ -75,12 +75,9 @@ namespace sys {
 // FILE TYPE IDENTIFIERS
 // ============================================
 struct LogFile {};
-struct TelemetryFile {};
-struct HX711DataLog {};
-struct IMUTimeFile {};
-struct BMPTimeFile {};
-struct AIRTimeFile {};
-struct SpeedFile {};
+struct Force {};
+struct Current {};
+struct Speed {};
 
 // ============================================
 // FILE TRAITS TEMPLATE
@@ -90,7 +87,6 @@ struct FileTraits {
     static_assert(sizeof(FileType) == -1, "FileTraits must be specialized for each file type");
 };
 
-// Example specializations
 template<>
 struct FileTraits<LogFile> {
     static constexpr const char* name = "system.log";
@@ -102,63 +98,33 @@ struct FileTraits<LogFile> {
 };
 
 template<>
-struct FileTraits<TelemetryFile> {
-    static constexpr const char* name = "telemetry.txt";
-    static constexpr uint32_t sync_time_ms = 1000;
-    static constexpr size_t buffer_size = 4096;
+struct FileTraits<Force> {
+    static constexpr const char* name = "load_cell.txt";
+    static constexpr uint32_t sync_time_ms = 2500;
+    static constexpr size_t buffer_size = 1024;
     static constexpr bool append_mode = true;
     static constexpr bool auto_sync = true;
-    static constexpr bool use_dma = true;  // Large data benefits from DMA
+    static constexpr bool use_dma = false;  // Log files don't need DMA
 };
 
 template<>
-struct FileTraits<SpeedFile> {
-    static constexpr const char* name = "speed.txt";
-    static constexpr uint32_t sync_time_ms = 1000;
-    static constexpr size_t buffer_size = 4096;
+struct FileTraits<Current> {
+    static constexpr const char* name = "power_sensor.txt";
+    static constexpr uint32_t sync_time_ms = 2500;
+    static constexpr size_t buffer_size = 1024;
     static constexpr bool append_mode = true;
     static constexpr bool auto_sync = true;
-    static constexpr bool use_dma = true;  // Large data benefits from DMA
+    static constexpr bool use_dma = false;  // Log files don't need DMA
 };
 
 template<>
-struct FileTraits<IMUTimeFile> {
-    static constexpr const char* name = "IMUTimeFile.txt";
-    static constexpr uint32_t sync_time_ms = 1000;
-    static constexpr size_t buffer_size = 1028;
-    static constexpr bool append_mode = false;
+struct FileTraits<Speed> {
+    static constexpr const char* name = "air_speed.txt";
+    static constexpr uint32_t sync_time_ms = 2500;
+    static constexpr size_t buffer_size = 1024;
+    static constexpr bool append_mode = true;
     static constexpr bool auto_sync = true;
-    static constexpr bool use_dma = true;  // Large data benefits from DMA
-};
-
-template<>
-struct FileTraits<BMPTimeFile> {
-    static constexpr const char* name = "BMPTimeFile.txt";
-    static constexpr uint32_t sync_time_ms = 1000;
-    static constexpr size_t buffer_size = 1028;
-    static constexpr bool append_mode = false;
-    static constexpr bool auto_sync = true;
-    static constexpr bool use_dma = true;  // Large data benefits from DMA
-};
-
-template<>
-struct FileTraits<AIRTimeFile> {
-    static constexpr const char* name = "AIRTimeFile.txt";
-    static constexpr uint32_t sync_time_ms = 1000;
-    static constexpr size_t buffer_size = 1028;
-    static constexpr bool append_mode = false;
-    static constexpr bool auto_sync = true;
-    static constexpr bool use_dma = true;  // Large data benefits from DMA
-};
-
-template<>
-struct FileTraits<HX711DataLog> {
-    static constexpr const char* name = "HX711DataLog.txt";
-    static constexpr uint32_t sync_time_ms = 1000;
-    static constexpr size_t buffer_size = 2048;
-    static constexpr bool append_mode = false;
-    static constexpr bool auto_sync = true;
-    static constexpr bool use_dma = true;  // Large data benefits from DMA
+    static constexpr bool use_dma = false;  // Log files don't need DMA
 };
 
 
