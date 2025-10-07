@@ -2,27 +2,44 @@
 #include "pico/stdio.h"
 #include "pico/multicore.h"
 
-#include <cstdio>
+#include "app/Core0Controller.h"
+#include "app/Core1Controller.h"
 
-#include "core.h"
-#include "core0.h"
-#include "core1.h"
+// Create the controller instances for each core
+static Core0Controller core0_controller;
+static Core1Controller core1_controller;
+
+// Core 1's entry point
+void core1_entry() {
+    if (core1_controller.init()) {
+        core1_controller.loop();
+    } else {
+        printf("FATAL: Core 1 failed to initialize.\n");
+        sleep_ms(100);
+        return;
+    }
+}
 
 int main() {
     stdio_init_all();
     sleep_ms(3000);
 
-    printf("Start Sequence.\n");
+    printf("System: Initializing Core 0...\n");
+    if (core0_controller.init()) {
+        printf("System: Launching Core 1...\n");
+        multicore_launch_core1(core1_entry);
+        sleep_ms(10);
+        printf("System: Core 0 entering main loop.\n");
+        core0_controller.loop();
+    } else {
+        printf("FATAL: Core 0 failed to initialize. System halted.\n");
+        sleep_ms(100);
+        return -1;
+    }
 
-    core0::init();
-    core1::init();
+    while(true) { 
+        sleep_ms(1000); 
+    }
 
-    multicore_launch_core1([]() { core1::loop(); });
-    
-    do {
-        core0::loop();
-    } while(true);
-
-    sleep_ms(1000);
     return 0;
 }

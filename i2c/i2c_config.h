@@ -55,6 +55,13 @@ namespace i2c::drivers {
         float temperature_c;
         bool valid;
     };
+
+    class ADS1115;
+    struct ads1115_data {
+        int16_t raw;
+        float voltage;
+        bool valid;
+    };
 }
 
 // ============================================================================
@@ -87,6 +94,14 @@ struct DeviceTraits<i2c::drivers::MS4525D0> {
     static constexpr const char* name = "MS4525D0";
     static constexpr uint32_t default_poll_rate = 500;  // 50Hz for airspeed
     using data_type = drivers::ms4525d0_data;
+};
+
+template<>
+struct DeviceTraits<i2c::drivers::ADS1115> {
+    static constexpr uint8_t address = 0x48; // Default for ADDR to GND
+    static constexpr const char* name = "ADS1115";
+    static constexpr uint32_t default_poll_rate = 10;
+    using data_type = drivers::ads1115_data;
 };
 
 } // namespace i2c
