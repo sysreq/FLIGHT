@@ -78,9 +78,13 @@ private:
     }
 
     void loop_impl() {
-        while (true) {
-            scheduler_.run();
-            sleep_ms(1);
-        }
+        scheduler_.run();
+    }
+
+    void shutdown_impl() {
+        printf("Core 0: Shutdown command received. Exiting loop.\n");
+        sdcard::SDFile<sdcard::LogFile>::Close();
+        printf("Core 0: Shutdown complete.\n");
+        sleep_ms(100);
     }
 };

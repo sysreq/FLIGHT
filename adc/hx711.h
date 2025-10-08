@@ -29,8 +29,8 @@ private:
     static constexpr uint8_t DEFAULT_DATA_PIN = 6;
     static constexpr uint8_t DEFAULT_SCK_PIN = 7;
     static constexpr uint8_t DEFAULT_GAIN_PULSES = 1;
-    static constexpr float DEFAULT_SCALE_FACTOR = 34718.4f;
-    static constexpr int32_t DEFAULT_TARE_OFFSET = -100000;
+    static constexpr float DEFAULT_SCALE_FACTOR = 33358.00f;
+    static constexpr int32_t DEFAULT_TARE_OFFSET = 98095;
 
     uint8_t DATA;
     uint8_t SCK;
@@ -178,17 +178,17 @@ public:
         tare_offset = DEFAULT_TARE_OFFSET;
 
 
-        printf("HX711: Calibration reset to defaults\\n");
+        printf("HX711: Calibration reset to defaults\n");
     }
 
     bool get_calibration_sample(float weight_lbs, uint8_t samples = OVERSAMPLE_COUNT) {
         if (calibration_count >= MAX_CALIBRATION_POINTS) {
-            printf("HX711: Calibration buffer full (%u points)\\n", MAX_CALIBRATION_POINTS);
+            printf("HX711: Calibration buffer full (%u points)\n", MAX_CALIBRATION_POINTS);
             return false;
         }
 
         if (!initialized) {
-            printf("HX711: Cannot calibrate - not initialized\\n");
+            printf("HX711: Cannot calibrate - not initialized\n");
             return false;
         }
 
@@ -203,7 +203,7 @@ public:
         while (success_count < samples) {
             if (!read_raw(temp_samples[success_count])) {
                 if (++error_count >= samples) {
-                    printf("HX711: Failed to gather calibration samples\\n");
+                    printf("HX711: Failed to gather calibration samples\n");
                     return false;
                 }
                 continue;
@@ -214,6 +214,7 @@ public:
         int64_t sum = 0;
         for (uint8_t i = 0; i < samples; i++) {
             sum += temp_samples[i];
+            printf("%d\n", temp_samples[i]);
         }
         float mean = static_cast<float>(sum) / samples;
 
@@ -235,7 +236,7 @@ public:
         }
 
         if (filtered_count == 0) {
-            printf("HX711: No valid samples after filtering\\n");
+            printf("HX711: No valid samples after filtering\n");
             return false;
         }
 
@@ -244,7 +245,7 @@ public:
         calibration_points[calibration_count].known_weight_lbs = weight_lbs;
         calibration_count++;
 
-        printf("HX711: Calibration point %u: raw=%d, weight=%.3f lbs (filtered %u/%u samples)\\n",
+        printf("HX711: Calibration point %u: raw=%d, weight=%.3f lbs (filtered %u/%u samples)\n",
                calibration_count, averaged_raw, weight_lbs, filtered_count, samples);
 
         return true;
@@ -252,7 +253,7 @@ public:
 
     bool calibrate_from_samples() {
         if (calibration_count < 2) {
-            printf("HX711: Need at least 2 calibration points (have %u)\\n", calibration_count);
+            printf("HX711: Need at least 2 calibration points (have %u)\n", calibration_count);
             return false;
         }
 
@@ -282,14 +283,14 @@ public:
         float b = (sum_y - m * sum_x) / n;
 
         if (m == 0.0f) {
-            printf("HX711: Calibration failed - slope is zero\\n");
+            printf("HX711: Calibration failed - slope is zero\n");
             return false;
         }
 
         scale_factor = 1.0f / m;
         tare_offset = static_cast<int32_t>(b / m);
 
-        printf("HX711: Calibration complete - scale_factor=%.2f, tare_offset=%d (m=%.6f, b=%.2f)\\n",
+        printf("HX711: Calibration complete - scale_factor=%.2f, tare_offset=%d (m=%.6f, b=%.2f)\n",
                scale_factor, tare_offset, m, b);
 
         return true;
@@ -304,6 +305,9 @@ public:
     void set_scale(float scale) { scale_factor = scale; }
     void set_offset(int32_t offset) { tare_offset = offset; }
     void set_gain(uint8_t gain) { gain_pulses = gain; }
+
+    float get_scale() { return scale_factor; }
+    uint32_t get_offset() { return tare_offset; }
 };
 
 } // namespace adc

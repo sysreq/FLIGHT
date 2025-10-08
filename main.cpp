@@ -1,6 +1,8 @@
 #include "pico/stdlib.h"
 #include "pico/stdio.h"
 #include "pico/multicore.h"
+#include "pico/bootrom.h"
+#include "hardware/resets.h"
 
 #include "app/Core0Controller.h"
 #include "app/Core1Controller.h"
@@ -34,12 +36,19 @@ int main() {
     } else {
         printf("FATAL: Core 0 failed to initialize. System halted.\n");
         sleep_ms(100);
-        return -1;
     }
 
-    while(true) { 
-        sleep_ms(1000); 
-    }
+    printf("System: Core 0 main loop exited. Shutdown complete.\n");
+    sleep_ms(100);
+    reset_block_num(RESET_USBCTRL);
 
+    int i = 0;
+    while(stdio_usb_connected() && i < 100) {
+        sleep_ms(10);
+        i++;
+        continue;
+    }
+    
+    reset_usb_boot(0, 0);
     return 0;
 }

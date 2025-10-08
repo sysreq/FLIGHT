@@ -9,6 +9,8 @@
 #include "adc/hx711.h"
 #include "network/handlers/shared_state.h"
 
+#include <cctype>
+
 using SensorBus = i2c::I2CBus<i2c0, 4, 5>;
 using ADS1115Data = i2c::drivers::ads1115_data;
 
@@ -78,11 +80,102 @@ private:
     }
 
     void loop_impl() {
-        while(true) {
-            if (network::handlers::g_shared_state.session_active.load()) {
-                 scheduler_.run();
+        bool is_scheduler_active = network::handlers::g_shared_state.session_active.load();
+        if (is_scheduler_active) {
+            scheduler_.run();
+        } else {
+            int8_t c = stdio_getchar_timeout_us(0);
+            if(c != PICO_ERROR_TIMEOUT) {
+                switch(std::tolower(c)) {
+                    case 'x':{
+                        this->shutdown();
+                        return;
+                    }
+                    case 'z': {
+                        scale_.zero();
+                        printf("Core 1: HX711 Zero'd.\n");
+                        break;
+                    }
+                    case 's': {
+                        static constexpr uint32_t DEFAULT_TIMEOUT = 30000000; // 30 seconds
+                        uint32_t dynamic_timeout = DEFAULT_TIMEOUT; // 30 seconds
+                        char buffer[32];
+                        bool input_valid = true;
+
+                        printf("Core 1: Enter calibration weight in lbs (e.g., 5.0): ");
+                        buffer[0] = '\0';
+                        do {
+                            c = stdio_getchar_timeout_us(dynamic_timeout);
+                            if(c == PICO_ERROR_TIMEOUT && dynamic_timeout == DEFAULT_TIMEOUT) {
+                                printf("\nCore 1: Calibration input timed out.\n");
+                                input_valid = false;
+                                break;
+                            } else if(c == PICO_ERROR_TIMEOUT && dynamic_timeout != DEFAULT_TIMEOUT) {
+                                break;
+                            } else if(std::isdigit(c) || c == '-' || c == '+' || c == '.') {
+                                size_t len = strlen(buffer);
+                                if (len < sizeof(buffer) - 1) {
+                                    buffer[len] = c;
+                                    buffer[len + 1] = '\0';
+                                }
+                                dynamic_timeout = 1000;
+                                input_valid = true;
+                            } else {
+                                printf("Core 1: Received non-numeric input, ending calibration input.\n");
+                                input_valid = false;
+                                break;
+                            }
+                        } while (true);
+
+                        if (!input_valid || strlen(buffer) == 0) {
+                            printf("Core 1: No valid calibration input received.\n");
+                            break;
+                        }
+
+                        float calibration_value = atof(buffer);
+                        if (calibration_value != 0 && scale_.get_calibration_sample(calibration_value, 32)) {
+                            printf("Core 1: HX711 Calibration sample for %.2f lbs recorded.\n", calibration_value);
+                        } else {
+                            printf("Core 1: HX711 Failed to record calibration sample for %.2f lbs.\n", calibration_value);
+                        }
+                        break;
+                    }
+                    case 't': {
+                        bool result = scale_.calibrate_from_samples();
+                        if (result) {
+                            printf("Core 1: HX711 Calibration successful.\n");
+                            printf("\tScale: %.2f | Offset: %d\n", scale_.get_scale(), scale_.get_offset());
+                        } else {
+                            printf("Core 1: HX711 Calibration failed.\n");
+                        }
+                        break;
+                    }
+                    case 'w': {
+                        scale_.update(32);
+                        if (scale_.valid()) {
+                            printf("Core 1: HX711 Current Weight: %.2f lbs (Raw: %d, Tared: %d)\n", 
+                                   scale_.weight(), scale_.raw(), scale_.tared());
+                        } else {
+                            printf("Core 1: HX711 Current Weight: Invalid reading\n");
+                        }  
+                        break;
+                    }
+
+                    default: {
+                        printf("Core 1: Unknown command '%c' received via stdin. Current Uptime: %d\n", c, time_us_32());
+                        break;
+                    }
+                }
             }
-            sleep_ms(1);
         }
+    }
+
+    void shutdown_impl() {
+        printf("Core 1: Shutdown command received. Exiting loop.\n");
+        SensorBus::shutdown();
+        sdcard::SDFile<sdcard::Force>::Close();
+        sdcard::SDFile<sdcard::Current>::Close();
+        printf("Core 1: Shutdown complete.\n");
+        sleep_ms(100);
     }
 };
