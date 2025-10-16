@@ -7,33 +7,37 @@
 #include <functional>
 #include <cstdint>
 #include <cstdio>
+#include "../misc/config.settings"
 
 class ADS1115 {
 public:
-    static constexpr uint16_t MUX_DIFF_0_1 = 0x0000;
-    static constexpr uint16_t MUX_DIFF_0_3 = 0x1000;
-    static constexpr uint16_t MUX_DIFF_1_3 = 0x2000;
-    static constexpr uint16_t MUX_DIFF_2_3 = 0x3000;
-    static constexpr uint16_t MUX_SINGLE_0 = 0x4000;
-    static constexpr uint16_t MUX_SINGLE_1 = 0x5000;
-    static constexpr uint16_t MUX_SINGLE_2 = 0x6000;
-    static constexpr uint16_t MUX_SINGLE_3 = 0x7000;
+    // MUX settings - use centralized constants
+    static constexpr uint16_t MUX_DIFF_0_1 = Config::ADS1115::Mux::DIFF_0_1;
+    static constexpr uint16_t MUX_DIFF_0_3 = Config::ADS1115::Mux::DIFF_0_3;
+    static constexpr uint16_t MUX_DIFF_1_3 = Config::ADS1115::Mux::DIFF_1_3;
+    static constexpr uint16_t MUX_DIFF_2_3 = Config::ADS1115::Mux::DIFF_2_3;
+    static constexpr uint16_t MUX_SINGLE_0 = Config::ADS1115::Mux::SINGLE_0;
+    static constexpr uint16_t MUX_SINGLE_1 = Config::ADS1115::Mux::SINGLE_1;
+    static constexpr uint16_t MUX_SINGLE_2 = Config::ADS1115::Mux::SINGLE_2;
+    static constexpr uint16_t MUX_SINGLE_3 = Config::ADS1115::Mux::SINGLE_3;
 
-    static constexpr uint16_t GAIN_6_144V = 0x0000;
-    static constexpr uint16_t GAIN_4_096V = 0x0200;
-    static constexpr uint16_t GAIN_2_048V = 0x0400;
-    static constexpr uint16_t GAIN_1_024V = 0x0600;
-    static constexpr uint16_t GAIN_0_512V = 0x0800;
-    static constexpr uint16_t GAIN_0_256V = 0x0A00;
+    // Gain settings - use centralized constants
+    static constexpr uint16_t GAIN_6_144V = Config::ADS1115::Gain::FS_6_144V;
+    static constexpr uint16_t GAIN_4_096V = Config::ADS1115::Gain::FS_4_096V;
+    static constexpr uint16_t GAIN_2_048V = Config::ADS1115::Gain::FS_2_048V;
+    static constexpr uint16_t GAIN_1_024V = Config::ADS1115::Gain::FS_1_024V;
+    static constexpr uint16_t GAIN_0_512V = Config::ADS1115::Gain::FS_0_512V;
+    static constexpr uint16_t GAIN_0_256V = Config::ADS1115::Gain::FS_0_256V;
 
-    static constexpr uint16_t RATE_8   = 0x0000;
-    static constexpr uint16_t RATE_16  = 0x0020;
-    static constexpr uint16_t RATE_32  = 0x0040;
-    static constexpr uint16_t RATE_64  = 0x0060;
-    static constexpr uint16_t RATE_128 = 0x0080;
-    static constexpr uint16_t RATE_250 = 0x00A0;
-    static constexpr uint16_t RATE_475 = 0x00C0;
-    static constexpr uint16_t RATE_860 = 0x00E0;
+    // Rate settings - use centralized constants
+    static constexpr uint16_t RATE_8   = Config::ADS1115::Rate::SPS_8;
+    static constexpr uint16_t RATE_16  = Config::ADS1115::Rate::SPS_16;
+    static constexpr uint16_t RATE_32  = Config::ADS1115::Rate::SPS_32;
+    static constexpr uint16_t RATE_64  = Config::ADS1115::Rate::SPS_64;
+    static constexpr uint16_t RATE_128 = Config::ADS1115::Rate::SPS_128;
+    static constexpr uint16_t RATE_250 = Config::ADS1115::Rate::SPS_250;
+    static constexpr uint16_t RATE_475 = Config::ADS1115::Rate::SPS_475;
+    static constexpr uint16_t RATE_860 = Config::ADS1115::Rate::SPS_860;
 
     struct Data {
         int16_t raw;
@@ -72,11 +76,12 @@ public:
     uint32_t errors() const { return error_count_; }
 
 private:
-    static constexpr uint8_t DEVICE_ADDR = 0x48;
-    static constexpr uint8_t REG_CONVERSION = 0x00;
-    static constexpr uint8_t REG_CONFIG = 0x01;
-    static constexpr uint32_t DEFAULT_BAUDRATE = 400'000;
-    static constexpr uint32_t DEFAULT_POLL_RATE = 10; // Hz
+    // Use centralized configuration constants
+    static constexpr uint8_t DEVICE_ADDR = Config::ADS1115::DEVICE_ADDRESS;
+    static constexpr uint8_t REG_CONVERSION = Config::ADS1115::CONVERSION_REGISTER;
+    static constexpr uint8_t REG_CONFIG = Config::ADS1115::CONFIG_REGISTER;
+    static constexpr uint32_t DEFAULT_BAUDRATE = Config::ADS1115::DEFAULT_BAUDRATE;
+    static constexpr uint32_t DEFAULT_POLL_RATE = Config::ADS1115::DEFAULT_POLL_RATE;
 
     i2c_inst_t* i2c_;
     uint sda_pin_;
@@ -85,9 +90,9 @@ private:
     Data data_{};
     bool initialized_ = false;
 
-    uint16_t mux_ = MUX_DIFF_0_1;
-    uint16_t gain_ = GAIN_2_048V;
-    uint16_t rate_ = RATE_128;
+    uint16_t mux_ = Config::ADS1115::DEFAULT_MUX;
+    uint16_t gain_ = Config::ADS1115::DEFAULT_GAIN;
+    uint16_t rate_ = Config::ADS1115::DEFAULT_RATE;
     float voltage_per_bit_ = 0.0f;
 
     bool converting_ = false;

@@ -1,32 +1,9 @@
 #include "include/ads1115_s.h"
+#include "../misc/config.settings"
 #include "../misc/utility.h"
 #include <cstring>
 
-// Constants copied from header for convenience
-constexpr uint16_t MUX_DIFF_0_1 = ADS1115::MUX_DIFF_0_1;
-constexpr uint16_t MUX_DIFF_0_3 = ADS1115::MUX_DIFF_0_3;
-constexpr uint16_t MUX_DIFF_1_3 = ADS1115::MUX_DIFF_1_3;
-constexpr uint16_t MUX_DIFF_2_3 = ADS1115::MUX_DIFF_2_3;
-constexpr uint16_t MUX_SINGLE_0 = ADS1115::MUX_SINGLE_0;
-constexpr uint16_t MUX_SINGLE_1 = ADS1115::MUX_SINGLE_1;
-constexpr uint16_t MUX_SINGLE_2 = ADS1115::MUX_SINGLE_2;
-constexpr uint16_t MUX_SINGLE_3 = ADS1115::MUX_SINGLE_3;
-
-constexpr uint16_t GAIN_6_144V = ADS1115::GAIN_6_144V;
-constexpr uint16_t GAIN_4_096V = ADS1115::GAIN_4_096V;
-constexpr uint16_t GAIN_2_048V = ADS1115::GAIN_2_048V;
-constexpr uint16_t GAIN_1_024V = ADS1115::GAIN_1_024V;
-constexpr uint16_t GAIN_0_512V = ADS1115::GAIN_0_512V;
-constexpr uint16_t GAIN_0_256V = ADS1115::GAIN_0_256V;
-
-constexpr uint16_t RATE_8   = ADS1115::RATE_8;
-constexpr uint16_t RATE_16  = ADS1115::RATE_16;
-constexpr uint16_t RATE_32  = ADS1115::RATE_32;
-constexpr uint16_t RATE_64  = ADS1115::RATE_64;
-constexpr uint16_t RATE_128 = ADS1115::RATE_128;
-constexpr uint16_t RATE_250 = ADS1115::RATE_250;
-constexpr uint16_t RATE_475 = ADS1115::RATE_475;
-constexpr uint16_t RATE_860 = ADS1115::RATE_860;
+// Constants are now centralized in config.settings
 
 ADS1115::ADS1115(i2c_inst_t* i2c, uint sda, uint scl)
     : i2c_(i2c), sda_pin_(sda), scl_pin_(scl) {}
@@ -82,17 +59,15 @@ uint16_t ADS1115::build_config(bool continuous) {
 }
 
 float ADS1115::calculate_voltage_per_bit(uint16_t gain) {
-    float range;
     switch(gain) {
-        case GAIN_6_144V: range = 6.144f; break;
-        case GAIN_4_096V: range = 4.096f; break;
-        case GAIN_2_048V: range = 2.048f; break;
-        case GAIN_1_024V: range = 1.024f; break;
-        case GAIN_0_512V: range = 0.512f; break;
-        case GAIN_0_256V: range = 0.256f; break;
-        default:          range = 6.144f;
+        case Config::ADS1115::Gain::FS_6_144V: return Config::Common::HX711_VOLTAGE_PER_BIT_6_144V;
+        case Config::ADS1115::Gain::FS_4_096V: return Config::Common::HX711_VOLTAGE_PER_BIT_4_096V;
+        case Config::ADS1115::Gain::FS_2_048V: return Config::Common::HX711_VOLTAGE_PER_BIT_2_048V;
+        case Config::ADS1115::Gain::FS_1_024V: return Config::Common::HX711_VOLTAGE_PER_BIT_1_024V;
+        case Config::ADS1115::Gain::FS_0_512V: return Config::Common::HX711_VOLTAGE_PER_BIT_0_512V;
+        case Config::ADS1115::Gain::FS_0_256V: return Config::Common::HX711_VOLTAGE_PER_BIT_0_256V;
+        default: return Config::Common::HX711_VOLTAGE_PER_BIT_6_144V;
     }
-    return range / 32768.0f;
 }
 
 bool ADS1115::init() {

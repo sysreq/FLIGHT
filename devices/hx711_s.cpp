@@ -1,4 +1,5 @@
 #include "include/hx711_s.h"
+#include "../misc/config.settings"
 #include "../misc/utility.h"
 #include <cstdio>
 #include <cmath>
@@ -42,7 +43,7 @@ bool HX711::read_raw(int32_t& value) {
         return !gpio_get(DEFAULT_DATA_PIN);
     };
 
-    if (!retry_with_timeout(wait_for_data_ready, 1000000, 100)) { // 1 second timeout, 100us delay
+    if (!retry_with_timeout(wait_for_data_ready, Config::Common::HX711_TIMEOUT_US, Config::Common::HX711_RETRY_DELAY_US)) {
         log_device("HX711", "Timeout waiting for data ready");
         return false;
     }

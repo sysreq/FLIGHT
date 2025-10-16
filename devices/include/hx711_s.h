@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <cstring>
+#include "../misc/config.settings"
 
 class HX711 {
 public:
@@ -42,12 +43,13 @@ public:
     uint8_t gain() const { return gain_pulses_; }
 
 private:
-    static constexpr uint32_t CLOCK_DELAY_US = 1;
-    static constexpr uint8_t DEFAULT_DATA_PIN = 28;
-    static constexpr uint8_t DEFAULT_SCK_PIN = 29;
-    static constexpr uint8_t DEFAULT_GAIN_PULSES = 1;
-    static constexpr float DEFAULT_SCALE_FACTOR = 33358.00f;
-    static constexpr int32_t DEFAULT_TARE_OFFSET = 98095;
+    // Use centralized configuration constants
+    static constexpr uint32_t CLOCK_DELAY_US = Config::HX711::CLOCK_DELAY_US;
+    static constexpr uint8_t DEFAULT_DATA_PIN = Config::HX711::DEFAULT_DATA_PIN;
+    static constexpr uint8_t DEFAULT_SCK_PIN = Config::HX711::DEFAULT_SCK_PIN;
+    static constexpr uint8_t DEFAULT_GAIN_PULSES = Config::HX711::DEFAULT_GAIN_PULSES;
+    static constexpr float DEFAULT_SCALE_FACTOR = Config::HX711::DEFAULT_SCALE_FACTOR;
+    static constexpr int32_t DEFAULT_TARE_OFFSET = Config::HX711::DEFAULT_TARE_OFFSET;
 
     uint8_t gain_pulses_;
     float scale_factor_;
@@ -56,10 +58,9 @@ private:
     Data current_data_{};
     bool initialized_ = false;
 
-    static constexpr uint8_t OVERSAMPLE_COUNT = 16;
-    static constexpr uint8_t MAX_OVERSAMPLE_SIZE = 64;
-
-    static constexpr uint8_t MAX_CALIBRATION_POINTS = 8;
+    static constexpr uint8_t OVERSAMPLE_COUNT = Config::HX711::OVERSAMPLE_COUNT;
+    static constexpr uint8_t MAX_OVERSAMPLE_SIZE = Config::HX711::MAX_OVERSAMPLE_SIZE;
+    static constexpr uint8_t MAX_CALIBRATION_POINTS = Config::HX711::MAX_CALIBRATION_POINTS;
     CalibrationPoint calibration_points_[MAX_CALIBRATION_POINTS];
     uint8_t calibration_count_ = 0;
 

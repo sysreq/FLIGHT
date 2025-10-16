@@ -1,0 +1,93 @@
+#pragma once
+
+#include <cstdint>
+
+namespace Config {
+
+namespace Hardware {
+    // GPIO pin assignments
+    static constexpr uint8_t HX711_DATA_PIN = 28;
+    static constexpr uint8_t HX711_CLOCK_PIN = 29;
+
+    // I2C settings
+    static constexpr uint32_t DEFAULT_I2C_BAUDRATE = 400'000;
+
+    // Common timing
+    static constexpr uint32_t HX711_CLOCK_DELAY_US = 1;
+}
+
+namespace HX711 {
+    static constexpr uint8_t DEFAULT_DATA_PIN = Hardware::HX711_DATA_PIN;
+    static constexpr uint8_t DEFAULT_SCK_PIN = Hardware::HX711_CLOCK_PIN;
+
+    static constexpr uint8_t DEFAULT_GAIN_PULSES = 1;
+    static constexpr uint32_t CLOCK_DELAY_US = Hardware::HX711_CLOCK_DELAY_US;
+
+    static constexpr float DEFAULT_SCALE_FACTOR = 33358.00f;
+    static constexpr int32_t DEFAULT_TARE_OFFSET = 98095;
+
+    static constexpr uint8_t OVERSAMPLE_COUNT = 16;
+    static constexpr uint8_t MAX_OVERSAMPLE_SIZE = 64;
+
+    static constexpr uint8_t MAX_CALIBRATION_POINTS = 8;
+}
+
+namespace ADS1115 {
+    static constexpr uint8_t DEVICE_ADDRESS = 0x48;
+    static constexpr uint8_t CONVERSION_REGISTER = 0x00;
+    static constexpr uint8_t CONFIG_REGISTER = 0x01;
+
+    static constexpr uint32_t DEFAULT_BAUDRATE = Hardware::DEFAULT_I2C_BAUDRATE;
+    static constexpr uint32_t DEFAULT_POLL_RATE = 10; // Hz
+
+    namespace Mux {
+        static constexpr uint16_t DIFF_0_1 = 0x0000;
+        static constexpr uint16_t DIFF_0_3 = 0x1000;
+        static constexpr uint16_t DIFF_1_3 = 0x2000;
+        static constexpr uint16_t DIFF_2_3 = 0x3000;
+        static constexpr uint16_t SINGLE_0 = 0x4000;
+        static constexpr uint16_t SINGLE_1 = 0x5000;
+        static constexpr uint16_t SINGLE_2 = 0x6000;
+        static constexpr uint16_t SINGLE_3 = 0x7000;
+    }
+
+    namespace Gain {
+        static constexpr uint16_t FS_6_144V = 0x0000;
+        static constexpr uint16_t FS_4_096V = 0x0200;
+        static constexpr uint16_t FS_2_048V = 0x0400;
+        static constexpr uint16_t FS_1_024V = 0x0600;
+        static constexpr uint16_t FS_0_512V = 0x0800;
+        static constexpr uint16_t FS_0_256V = 0x0A00;
+    }
+
+    namespace Rate {
+        static constexpr uint16_t SPS_8   = 0x0000;
+        static constexpr uint16_t SPS_16  = 0x0020;
+        static constexpr uint16_t SPS_32  = 0x0040;
+        static constexpr uint16_t SPS_64  = 0x0060;
+        static constexpr uint16_t SPS_128 = 0x0080;
+        static constexpr uint16_t SPS_250 = 0x00A0;
+        static constexpr uint16_t SPS_475 = 0x00C0;
+        static constexpr uint16_t SPS_860 = 0x00E0;
+    }
+
+    static constexpr uint16_t DEFAULT_MUX = Mux::DIFF_0_1;
+    static constexpr uint16_t DEFAULT_GAIN = Gain::FS_2_048V;
+    static constexpr uint16_t DEFAULT_RATE = Rate::SPS_128;
+}
+
+namespace Common {
+    static constexpr uint32_t MAX_RETRY_ERRORS = 10;
+
+    static constexpr uint32_t HX711_TIMEOUT_US = 1'000'000; // 1 second
+    static constexpr uint32_t HX711_RETRY_DELAY_US = 100;
+
+    static constexpr float HX711_VOLTAGE_PER_BIT_6_144V = 6.144f / 32768.0f;
+    static constexpr float HX711_VOLTAGE_PER_BIT_4_096V = 4.096f / 32768.0f;
+    static constexpr float HX711_VOLTAGE_PER_BIT_2_048V = 2.048f / 32768.0f;
+    static constexpr float HX711_VOLTAGE_PER_BIT_1_024V = 1.024f / 32768.0f;
+    static constexpr float HX711_VOLTAGE_PER_BIT_0_512V = 0.512f / 32768.0f;
+    static constexpr float HX711_VOLTAGE_PER_BIT_0_256V = 0.256f / 32768.0f;
+}
+
+} // namespace Config
