@@ -1,7 +1,7 @@
 # Generated Cmake Pico project file
 
 cmake_minimum_required(VERSION 3.13)
-
+set(PROJECT_IDENTITY FORWARD_MODULE)
 set(CMAKE_C_STANDARD 17)
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
@@ -27,19 +27,17 @@ endif()
 set(PICO_BOARD pico2_w CACHE STRING "Board type")
 include(pico_sdk_import.cmake)
 
-project(FLIGHT C CXX ASM)
+project(${PROJECT_IDENTITY} C CXX ASM)
 
 pico_sdk_init()
 
-add_subdirectory(network)
+add_executable(${PROJECT_IDENTITY} main.cpp)
 
-add_executable(FLIGHT main.cpp)
+pico_set_program_name(${PROJECT_IDENTITY} "FORWARD MODULE")
+pico_set_program_version(${PROJECT_IDENTITY} "1.0")
 
-pico_set_program_name(FLIGHT "FLIGHT")
-pico_set_program_version(FLIGHT "0.1")
-
-pico_enable_stdio_uart(FLIGHT 0)
-pico_enable_stdio_usb(FLIGHT 1)
+pico_enable_stdio_uart(${PROJECT_IDENTITY} 0)
+pico_enable_stdio_usb(${PROJECT_IDENTITY} 1)
 
 add_subdirectory(lib)
 
@@ -74,29 +72,27 @@ target_link_libraries(pico_bundle INTERFACE
     pico_cxx_options
 )
 
-target_link_libraries(FLIGHT
+target_link_libraries(${PROJECT_IDENTITY}
     pico_bundle
     third_party
     network
 )
 
 # Add the standard include files to the build
-target_include_directories(FLIGHT PRIVATE
+target_include_directories(${PROJECT_IDENTITY} PRIVATE
         ${CMAKE_CURRENT_LIST_DIR}
         ${CMAKE_CURRENT_LIST_DIR}/i2c
-        ${CMAKE_CURRENT_LIST_DIR}/sdcard
         ${CMAKE_CURRENT_LIST_DIR}/lib
-        ${CMAKE_CURRENT_LIST_DIR}/network/platform
 )
 
 # Linker options
-target_link_options(${PROJECT_NAME} PRIVATE
+target_link_options(${PROJECT_IDENTITY} PRIVATE
     -Wl,--gc-sections
     -Wl,--print-memory-usage
     -Wl,--no-wchar-size-warning
     -Wl,--cref
-    -Wl,-Map=${PROJECT_NAME}.map
+    -Wl,-Map=${PROJECT_IDENTITY}.map
 )
 
-pico_add_extra_outputs(FLIGHT)
+pico_add_extra_outputs(${PROJECT_IDENTITY})
 
