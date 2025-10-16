@@ -1,21 +1,17 @@
-#include <functional>
-#include <cstdint>
-#include <cstdio>
 #include <cstring>
+#include <cstdint>
+#include <functional>
 
-#include "include/ads1115_s.h"
-#include "../misc/config.settings"
-#include "../misc/utility.h"
-
-#include "pico/time.h"
-
+#include "hardware/gpio.h"
 #include "hardware/i2c.h"
 #include "hardware/timer.h"
-#include "hardware/gpio.h"
+#include "pico/time.h"
+
+#include "include/ads1115_s.h"
+#include "misc/config.settings"
+#include "misc/utility.h"
 
 using namespace Config;
-
-static i2c_inst_t* i2c_;
 
 inline bool write_register(i2c_inst_t* i2c, uint8_t reg, uint8_t value) {
     uint8_t buffer[2] = {reg, value};
@@ -61,14 +57,14 @@ constexpr float calculate_voltage_per_bit(uint16_t gain) {
     }
 }
 
-ADS1115Device::ADS1115Device(i2c_inst_t* i2c) : i2c_(i2c) {}
+ADS1115Device::ADS1115Device(i2c_inst* i2c) : i2c_(i2c) {}
 
 ADS1115Device::~ADS1115Device() {
     shutdown();
 }
 
 // Timer callback (static for C API)
-bool ADS1115Device::timer_callback(repeating_timer_t* rt) {
+bool ADS1115Device::timer_callback(repeating_timer* rt) {
     auto* self = static_cast<ADS1115Device*>(rt->user_data);
 
     auto update_operation = [&]() { return self->update(); };
@@ -184,7 +180,7 @@ bool ADS1115Device::start_polling(std::function<void(const Data&)> handler) {
     error_count_ = 0;
 
     int64_t interval_us = -static_cast<int64_t>(1000000 / poll_rate_hz_);
-    polling_ = add_repeating_timer_us(interval_us, timer_callback, this, &timer_);
+    polling_ = add_repeating_timer_us(interval_us, timer_callback, this, nullptr);
 
     if (polling_) {
         log_device("ADS1115", "Polling at %u Hz", poll_rate_hz_);
@@ -194,7 +190,7 @@ bool ADS1115Device::start_polling(std::function<void(const Data&)> handler) {
 
 void ADS1115Device::stop_polling() {
     if (polling_) {
-        cancel_repeating_timer(&timer_);
+        cancel_repeating_timer(nullptr);
         polling_ = false;
         log_device("ADS1115", "Polling stopped");
     }

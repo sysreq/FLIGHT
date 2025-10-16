@@ -1,10 +1,11 @@
 #pragma once
 
-#include "hardware/i2c.h"
-#include "pico/time.h"
-#include <functional>
 #include <cstdint>
-#include <cstdio>
+#include <functional>
+
+// Forward declarations for pico types
+struct repeating_timer;
+struct i2c_inst;
 
 class ADS1115Device {
 public:
@@ -14,7 +15,7 @@ public:
         bool valid;
     };
 
-    ADS1115Device(i2c_inst_t* i2c);
+    ADS1115Device(i2c_inst* i2c);
     ~ADS1115Device();
 
     bool init();
@@ -37,18 +38,19 @@ public:
     uint32_t errors() const { return error_count_; }
 
 private:
+    repeating_timer* timer_ = nullptr;
+    i2c_inst* i2c_ = nullptr;
+
     Data data_{};
     bool initialized_ = false;
-    i2c_inst_t* i2c_;
+
     float voltage_per_bit_ = 0.0f;
 
     bool converting_ = false;
-
-    repeating_timer_t timer_{};
     std::function<void(const Data&)> callback_;
     uint32_t poll_rate_hz_ = 0;
     uint32_t error_count_ = 0;
     bool polling_ = false;
 
-    static bool timer_callback(repeating_timer_t* rt);
+    static bool timer_callback(repeating_timer* rt);
 };
