@@ -26,14 +26,12 @@ class HX711 {
 private:
     static constexpr uint32_t CLOCK_DELAY_US = 1;
 
-    static constexpr uint8_t DEFAULT_DATA_PIN = 6;
-    static constexpr uint8_t DEFAULT_SCK_PIN = 7;
+    static constexpr uint8_t DEFAULT_DATA_PIN = 28;
+    static constexpr uint8_t DEFAULT_SCK_PIN = 29;
     static constexpr uint8_t DEFAULT_GAIN_PULSES = 1;
     static constexpr float DEFAULT_SCALE_FACTOR = 33358.00f;
     static constexpr int32_t DEFAULT_TARE_OFFSET = 98095;
 
-    uint8_t DATA;
-    uint8_t SCK;
     uint8_t gain_pulses;
     float scale_factor;
     int32_t tare_offset; 
@@ -57,7 +55,7 @@ private:
 public:
     bool read_raw(int32_t& value) {
         uint32_t timeout = 0;
-        while (gpio_get(DATA)) {
+        while (gpio_get(DEFAULT_DATA_PIN)) {
             sleep_us(100);
             if (++timeout > 10000) {
                 printf("HX711: Timeout waiting for data ready\n");
@@ -69,22 +67,22 @@ public:
         uint32_t raw_data = 0;
         
         for (int i = 0; i < 24; i++) {
-            gpio_put(SCK, true);
+            gpio_put(DEFAULT_SCK_PIN, true);
             busy_wait_us(CLOCK_DELAY_US);
             
             raw_data = (raw_data << 1);
-            if (gpio_get(DATA)) {
+            if (gpio_get(DEFAULT_DATA_PIN)) {
                 raw_data |= 1;
             }
             
-            gpio_put(SCK, false);
+            gpio_put(DEFAULT_SCK_PIN, false);
             busy_wait_us(CLOCK_DELAY_US);
         }
         
         for (int i = 0; i < gain_pulses; i++) {
-            gpio_put(SCK, true);
+            gpio_put(DEFAULT_SCK_PIN, true);
             busy_wait_us(CLOCK_DELAY_US);
-            gpio_put(SCK, false);
+            gpio_put(DEFAULT_SCK_PIN, false);
             busy_wait_us(CLOCK_DELAY_US);
         }
         
@@ -94,8 +92,7 @@ public:
         return true;
     }
 
-    HX711(uint8_t data_pin = DEFAULT_DATA_PIN, uint8_t sck_pin = DEFAULT_SCK_PIN)
-        : DATA(data_pin), SCK(sck_pin),
+    HX711() :
           gain_pulses(DEFAULT_GAIN_PULSES),
           scale_factor(DEFAULT_SCALE_FACTOR),
           tare_offset(DEFAULT_TARE_OFFSET) {}
@@ -105,15 +102,15 @@ public:
             return true;
         }
         
-        gpio_init(DATA);
-        gpio_init(SCK);
+        gpio_init(DEFAULT_DATA_PIN);
+        gpio_init(DEFAULT_SCK_PIN);
         
-        gpio_set_dir(SCK, GPIO_IN);
-        gpio_set_dir(SCK, GPIO_OUT);
+        gpio_set_dir(DEFAULT_SCK_PIN, GPIO_IN);
+        gpio_set_dir(DEFAULT_SCK_PIN, GPIO_OUT);
         
-        gpio_pull_up(DATA);
+        gpio_pull_up(DEFAULT_DATA_PIN);
         
-        gpio_put(SCK, false);
+        gpio_put(DEFAULT_SCK_PIN, false);
         
         sleep_ms(400);
     
@@ -121,7 +118,7 @@ public:
         read_raw(dummy);
         
         initialized = true;
-        printf("HX711: Initialized (data: GPIO%d, clock: GPIO%d)\n", DATA, SCK);
+        printf("HX711: Initialized (data: GPIO%d, clock: GPIO%d)\n", DEFAULT_DATA_PIN, DEFAULT_SCK_PIN);
         
         return true;
     }

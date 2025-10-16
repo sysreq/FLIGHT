@@ -39,8 +39,6 @@ pico_set_program_version(${PROJECT_IDENTITY} "1.0")
 pico_enable_stdio_uart(${PROJECT_IDENTITY} 0)
 pico_enable_stdio_usb(${PROJECT_IDENTITY} 1)
 
-add_subdirectory(lib)
-
 # Create a bundled interface library for all Pico SDK components
 add_library(pico_bundle INTERFACE)
 
@@ -50,10 +48,7 @@ target_link_libraries(pico_bundle INTERFACE
     pico_multicore
     pico_bootrom
     pico_sync
-    
-    # WiFi support (if using Pico W)
-    pico_cyw43_arch_lwip_poll
-    
+        
     # Hardware interfaces
     hardware_resets
     hardware_clocks
@@ -74,15 +69,14 @@ target_link_libraries(pico_bundle INTERFACE
 
 target_link_libraries(${PROJECT_IDENTITY}
     pico_bundle
-    third_party
-    network
 )
 
 # Add the standard include files to the build
 target_include_directories(${PROJECT_IDENTITY} PRIVATE
         ${CMAKE_CURRENT_LIST_DIR}
         ${CMAKE_CURRENT_LIST_DIR}/i2c
-        ${CMAKE_CURRENT_LIST_DIR}/lib
+        ${CMAKE_CURRENT_LIST_DIR}/app
+        ${CMAKE_CURRENT_LIST_DIR}/adc
 )
 
 # Linker options
