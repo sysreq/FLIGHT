@@ -15,13 +15,53 @@
 
 using namespace Config;
 
-ADS1115Device::ADS1115Device(i2c_inst_t* i2c)
-    : i2c_(i2c), sda_pin_(ADS1115::DATA_PIN),
-      scl_pin_(ADS1115::CLOCK_PIN),
-      poll_rate_hz_(ADS1115::POLL_RATE),
-      mux_(ADS1115::DEFAULT_MUX),
-      gain_(ADS1115::DEFAULT_GAIN),
-      rate_(ADS1115::DEFAULT_RATE) {}
+static i2c_inst_t* i2c_;
+
+inline bool write_register(i2c_inst_t* i2c, uint8_t reg, uint8_t value) {
+    uint8_t buffer[2] = {reg, value};
+    return i2c_write_blocking(i2c, ADS1115::DEVICE_ADDRESS, buffer, 2, false) == 2;
+}
+
+inline bool write_registers(i2c_inst_t* i2c, uint8_t reg, const uint8_t* data, size_t len) {
+    uint8_t buffer[len + 1];
+    buffer[0] = reg;
+    memcpy(&buffer[1], data, len);
+    return i2c_write_blocking(i2c, ADS1115::DEVICE_ADDRESS, buffer, len + 1, false) == len + 1;
+}
+
+inline bool read_registers(i2c_inst_t* i2c, uint8_t reg, uint8_t* buffer, size_t len) {
+    if (i2c_write_blocking(i2c, ADS1115::DEVICE_ADDRESS, &reg, 1, true) != 1)
+        return false;
+    return i2c_read_blocking(i2c, ADS1115::DEVICE_ADDRESS, buffer, len, false) == len;
+}
+
+uint16_t build_config(bool continuous) {
+    uint16_t config = static_cast<uint16_t>(ADS1115::DEFAULT_MUX) |
+                     static_cast<uint16_t>(ADS1115::DEFAULT_GAIN) |
+                     static_cast<uint16_t>(ADS1115::DEFAULT_RATE) |
+                     0x0003;
+    
+    if (!continuous) {
+        config |= 0x0100; // Single-shot mode
+    }
+    return config;
+}
+
+constexpr float calculate_voltage_per_bit(uint16_t gain) {
+    using namespace Config::ADS1115::Gain;
+
+    switch(gain) {
+        case FS_6_144V: return Config::Common::VOLTAGE_PER_BIT_6_144V;
+        case FS_4_096V: return Config::Common::VOLTAGE_PER_BIT_4_096V;
+        case FS_2_048V: return Config::Common::VOLTAGE_PER_BIT_2_048V;
+        case FS_1_024V: return Config::Common::VOLTAGE_PER_BIT_1_024V;
+        case FS_0_512V: return Config::Common::VOLTAGE_PER_BIT_0_512V;
+        case FS_0_256V: return Config::Common::VOLTAGE_PER_BIT_0_256V;
+        default: return Config::Common::VOLTAGE_PER_BIT_6_144V;
+    }
+}
+
+ADS1115Device::ADS1115Device(i2c_inst_t* i2c) : i2c_(i2c) {}
 
 ADS1115Device::~ADS1115Device() {
     shutdown();
@@ -43,61 +83,17 @@ bool ADS1115Device::timer_callback(repeating_timer_t* rt) {
     }
 }
 
-bool ADS1115Device::write_register(uint8_t reg, uint8_t value) {
-    uint8_t buffer[2] = {reg, value};
-    return i2c_write_blocking(i2c_, ADS1115::DEVICE_ADDRESS, buffer, 2, false) == 2;
-}
-
-bool ADS1115Device::write_registers(uint8_t reg, const uint8_t* data, size_t len) {
-    uint8_t buffer[len + 1];
-    buffer[0] = reg;
-    memcpy(&buffer[1], data, len);
-    return i2c_write_blocking(i2c_, ADS1115::DEVICE_ADDRESS, buffer, len + 1, false) == len + 1;
-}
-
-bool ADS1115Device::read_registers(uint8_t reg, uint8_t* buffer, size_t len) {
-    if (i2c_write_blocking(i2c_, ADS1115::DEVICE_ADDRESS, &reg, 1, true) != 1)
-        return false;
-    return i2c_read_blocking(i2c_, ADS1115::DEVICE_ADDRESS, buffer, len, false) == len;
-}
-
-uint16_t ADS1115Device::build_config(bool continuous) {
-    uint16_t config = static_cast<uint16_t>(mux_) |
-                     static_cast<uint16_t>(gain_) |
-                     static_cast<uint16_t>(rate_) |
-                     0x0003;
-    
-    if (!continuous) {
-        config |= 0x0100; // Single-shot mode
-    }
-    return config;
-}
-
-float ADS1115Device::calculate_voltage_per_bit(uint16_t gain) {
-    using namespace Config::ADS1115::Gain;
-
-    switch(gain) {
-        case FS_6_144V: return Config::Common::VOLTAGE_PER_BIT_6_144V;
-        case FS_4_096V: return Config::Common::VOLTAGE_PER_BIT_4_096V;
-        case FS_2_048V: return Config::Common::VOLTAGE_PER_BIT_2_048V;
-        case FS_1_024V: return Config::Common::VOLTAGE_PER_BIT_1_024V;
-        case FS_0_512V: return Config::Common::VOLTAGE_PER_BIT_0_512V;
-        case FS_0_256V: return Config::Common::VOLTAGE_PER_BIT_0_256V;
-        default: return Config::Common::VOLTAGE_PER_BIT_6_144V;
-    }
-}
-
 bool ADS1115Device::init() {
     if (initialized_) return true;
 
     i2c_init(i2c_, ADS1115::BAUDRATE);
-    gpio_set_function(sda_pin_, GPIO_FUNC_I2C);
-    gpio_set_function(scl_pin_, GPIO_FUNC_I2C);
-    gpio_pull_up(sda_pin_);
-    gpio_pull_up(scl_pin_);
+    gpio_set_function(ADS1115::DATA_PIN, GPIO_FUNC_I2C);
+    gpio_set_function(ADS1115::CLOCK_PIN, GPIO_FUNC_I2C);
+    gpio_pull_up(ADS1115::DATA_PIN);
+    gpio_pull_up(ADS1115::CLOCK_PIN);
 
     log_device("I2C", "Initialized (SDA=%u, SCL=%u, %u Hz)",
-            sda_pin_, scl_pin_, ADS1115::BAUDRATE);
+            ADS1115::DATA_PIN, ADS1115::CLOCK_PIN, ADS1115::BAUDRATE);
 
     uint8_t dummy;
     if (i2c_read_blocking(i2c_, ADS1115::DEVICE_ADDRESS, &dummy, 1, false) < 0) {
@@ -105,7 +101,7 @@ bool ADS1115Device::init() {
         return false;
     }
 
-    voltage_per_bit_ = calculate_voltage_per_bit(gain_);
+    voltage_per_bit_ = calculate_voltage_per_bit(ADS1115::DEFAULT_GAIN);
 
     initialized_ = true;
     log_device("ADS1115", "Initialized");
@@ -132,7 +128,7 @@ bool ADS1115Device::start_conversion() {
         static_cast<uint8_t>(config & 0xFF)
     };
 
-    if (!write_registers(ADS1115::CONFIG_REGISTER, bytes, 2)) {
+    if (!write_registers(i2c_, ADS1115::CONFIG_REGISTER, bytes, 2)) {
         return false;
     }
 
@@ -149,7 +145,7 @@ bool ADS1115Device::stop_conversion() {
         static_cast<uint8_t>(config & 0xFF)
     };
 
-    if (!write_registers(ADS1115::CONFIG_REGISTER, bytes, 2)) {
+    if (!write_registers(i2c_, ADS1115::CONFIG_REGISTER, bytes, 2)) {
         return false;
     }
 
@@ -170,7 +166,7 @@ bool ADS1115Device::update() {
     }
 
     uint8_t buffer[2];
-    if (!read_registers(ADS1115::CONVERSION_REGISTER, buffer, 2)) {
+    if (!read_registers(i2c_, ADS1115::CONVERSION_REGISTER, buffer, 2)) {
         data_.valid = false;
         return false;
     }

@@ -37,16 +37,9 @@ public:
     uint32_t errors() const { return error_count_; }
 
 private:
-    i2c_inst_t* i2c_;
-    uint sda_pin_;
-    uint scl_pin_;
-
     Data data_{};
     bool initialized_ = false;
-
-    const uint16_t mux_;
-    const uint16_t gain_;
-    const uint16_t rate_;
+    i2c_inst_t* i2c_;
     float voltage_per_bit_ = 0.0f;
 
     bool converting_ = false;
@@ -58,11 +51,4 @@ private:
     bool polling_ = false;
 
     static bool timer_callback(repeating_timer_t* rt);
-
-    bool write_register(uint8_t reg, uint8_t value);
-    bool write_registers(uint8_t reg, const uint8_t* data, size_t len);
-    bool read_registers(uint8_t reg, uint8_t* buffer, size_t len);
-
-    uint16_t build_config(bool continuous);
-    float calculate_voltage_per_bit(uint16_t gain);
 };
