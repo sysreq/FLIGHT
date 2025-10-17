@@ -2,13 +2,6 @@
 
 #include <atomic>
 
-/**
- * @brief A base class for a core's main controller using the CRTP pattern
- * to eliminate virtual function overhead.
- *
- * @tparam Derived The concrete core controller class (e.g., Core0SystemCore).
- */
-
  namespace app::SystemCore::Global {
     static inline std::atomic<bool> system_active_{true};
  }
@@ -26,8 +19,12 @@ public:
 
     void loop() {
         while (is_system_active()) {
+            static constexpr uint32_t TARGET_TIME = 1000; 
+            uint32_t start = time_us_32();
             static_cast<Derived*>(this)->loop_impl();
-            sleep_ms(1);
+            int32_t delta_us = 1000 - (time_us_32() - start);
+            delta_us &= ~(delta_us >> 31);
+            sleep_us(delta_us);
         }
         static_cast<Derived*>(this)->shutdown_impl();
     }
