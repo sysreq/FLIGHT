@@ -7,11 +7,10 @@
 #include "hx711_s.h"
 #include "ads1115_s.h"
 
-class Core1Controller : public SystemCore<Core1Controller> {
+class Core1Controller : public SystemCore<Core1Controller, 8> {
 private:
-    friend class SystemCore<Core1Controller>;
+    friend class SystemCore<Core1Controller, 8>;
 
-    Scheduler scheduler_;
     HX711Device scale_;
     ADS1115Device ads1115_;
     
@@ -30,39 +29,30 @@ private:
         }
     }
 
+    #define QUIT_ON_FAILURE(_FUNC_, _NAME_)                              \
+    do {                                                                 \
+    if (!_FUNC_) { printf("Core 1: Failed to initialize " _NAME_ "!\n"); \
+    return false; } else { printf("Core 1: " _NAME_ " started.\n"); }        \
+    } while(false) 
+
     bool init_impl() {
         printf("Core 1: Initializing...\n");
 
-        if (!scale_.init()) {
-            printf("Core 1: Failed to initialize HX711!\n");
-            return false;
-        }
-        printf("Core 1: HX711 Initialized.\n");
+        QUIT_ON_FAILURE(scale_.init(), "HX711");
+        QUIT_ON_FAILURE(ads1115_.init(), "ADS1115");
+        QUIT_ON_FAILURE(ads1115_.start_polling([this](const ADS1115Device::Data& data)
+            { this->on_ads1115_data(data); }), "ADS1115 polling");
 
-        // Initialize ADS1115 with I2C instance
-        if (!ads1115_.init()) {
-            printf("Core 1: Failed to initialize ADS1115!\n");
-            return false;
-        }
-        printf("Core 1: ADS1115 Initialized.\n");
-
-        // Start polling for ADS1115 data
-        if (!ads1115_.start_polling([this](const ADS1115Device::Data& data) {
-            this->on_ads1115_data(data);
-        })) {
-            printf("Core 1: Failed to start ADS1115 polling!\n");
-            return false;
-        }
-        printf("Core 1: ADS1115 polling started.\n");
-
-        scheduler_.add_task([this]() { this->poll_hx711(); }, 50);
+        add_task(&Core1Controller::poll_hx711, 50);
 
         printf("Core 1: Initialized successfully.\n");
         return true;
     }
 
+    #undef QUIT_ON_FAILURE
+
     void loop_impl() {
-        scheduler_.run();
+        __nop();
     }
 
     void shutdown_impl() {
