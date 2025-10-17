@@ -15,7 +15,7 @@ public:
         bool valid;
     };
 
-    ADS1115Device(i2c_inst* i2c);
+    ADS1115Device() = default;
     ~ADS1115Device();
 
     bool init();
@@ -28,18 +28,17 @@ public:
     bool start_polling(std::function<void(const Data&)> handler);
     void stop_polling();
 
-    const Data& data() const { return data_; }
-    int16_t raw() const { return data_.raw; }
-    float voltage() const { return data_.voltage; }
-    bool valid() const { return data_.valid; }
+    inline const Data& data() const { return data_; }
+    inline int16_t raw() const { return data_.raw; }
+    inline float voltage() const { return data_.voltage; }
+    inline bool valid() const { return data_.valid; }
 
-    bool is_polling() const { return polling_; }
-    bool is_converting() const { return converting_; }
-    uint32_t errors() const { return error_count_; }
+    inline bool is_polling() const { return polling_; }
+    inline bool is_converting() const { return converting_; }
+    inline uint32_t errors() const { return error_count_; }
 
 private:
     repeating_timer* timer_ = nullptr;
-    i2c_inst* i2c_ = nullptr;
 
     Data data_{};
     bool initialized_ = false;

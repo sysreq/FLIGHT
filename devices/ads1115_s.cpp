@@ -13,22 +13,22 @@
 
 using namespace Config;
 
-inline bool write_register(i2c_inst_t* i2c, uint8_t reg, uint8_t value) {
+inline bool write_register(uint8_t reg, uint8_t value) {
     uint8_t buffer[2] = {reg, value};
-    return i2c_write_blocking(i2c, ADS1115::DEVICE_ADDRESS, buffer, 2, false) == 2;
+    return i2c_write_blocking(ADS1115::DEVICE_BUS, ADS1115::DEVICE_ADDRESS, buffer, 2, false) == 2;
 }
 
-inline bool write_registers(i2c_inst_t* i2c, uint8_t reg, const uint8_t* data, size_t len) {
+inline bool write_registers(uint8_t reg, const uint8_t* data, size_t len) {
     uint8_t buffer[len + 1];
     buffer[0] = reg;
     memcpy(&buffer[1], data, len);
-    return i2c_write_blocking(i2c, ADS1115::DEVICE_ADDRESS, buffer, len + 1, false) == len + 1;
+    return i2c_write_blocking(ADS1115::DEVICE_BUS, ADS1115::DEVICE_ADDRESS, buffer, len + 1, false) == len + 1;
 }
 
-inline bool read_registers(i2c_inst_t* i2c, uint8_t reg, uint8_t* buffer, size_t len) {
-    if (i2c_write_blocking(i2c, ADS1115::DEVICE_ADDRESS, &reg, 1, true) != 1)
+inline bool read_registers(uint8_t reg, uint8_t* buffer, size_t len) {
+    if (i2c_write_blocking(ADS1115::DEVICE_BUS, ADS1115::DEVICE_ADDRESS, &reg, 1, true) != 1)
         return false;
-    return i2c_read_blocking(i2c, ADS1115::DEVICE_ADDRESS, buffer, len, false) == len;
+    return i2c_read_blocking(ADS1115::DEVICE_BUS, ADS1115::DEVICE_ADDRESS, buffer, len, false) == len;
 }
 
 uint16_t build_config(bool continuous) {
@@ -57,8 +57,6 @@ constexpr float calculate_voltage_per_bit(uint16_t gain) {
     }
 }
 
-ADS1115Device::ADS1115Device(i2c_inst* i2c) : i2c_(i2c) {}
-
 ADS1115Device::~ADS1115Device() {
     shutdown();
 }
@@ -82,7 +80,7 @@ bool ADS1115Device::timer_callback(repeating_timer* rt) {
 bool ADS1115Device::init() {
     if (initialized_) return true;
 
-    i2c_init(i2c_, ADS1115::BAUDRATE);
+    i2c_init(ADS1115::DEVICE_BUS, ADS1115::BAUDRATE);
     gpio_set_function(ADS1115::DATA_PIN, GPIO_FUNC_I2C);
     gpio_set_function(ADS1115::CLOCK_PIN, GPIO_FUNC_I2C);
     gpio_pull_up(ADS1115::DATA_PIN);
@@ -92,7 +90,7 @@ bool ADS1115Device::init() {
             ADS1115::DATA_PIN, ADS1115::CLOCK_PIN, ADS1115::BAUDRATE);
 
     uint8_t dummy;
-    if (i2c_read_blocking(i2c_, ADS1115::DEVICE_ADDRESS, &dummy, 1, false) < 0) {
+    if (i2c_read_blocking(ADS1115::DEVICE_BUS, ADS1115::DEVICE_ADDRESS, &dummy, 1, false) < 0) {
         log_device("ADS1115", "Not found at address 0x%02X", ADS1115::DEVICE_ADDRESS);
         return false;
     }
@@ -108,7 +106,7 @@ void ADS1115Device::shutdown() {
     if (initialized_) {
         stop_polling();
         stop_conversion();
-        i2c_deinit(i2c_);
+        i2c_deinit(ADS1115::DEVICE_BUS);
         initialized_ = false;
         log_device("ADS1115", "Shutdown");
     }
@@ -124,7 +122,7 @@ bool ADS1115Device::start_conversion() {
         static_cast<uint8_t>(config & 0xFF)
     };
 
-    if (!write_registers(i2c_, ADS1115::CONFIG_REGISTER, bytes, 2)) {
+    if (!write_registers(ADS1115::CONFIG_REGISTER, bytes, 2)) {
         return false;
     }
 
@@ -141,7 +139,7 @@ bool ADS1115Device::stop_conversion() {
         static_cast<uint8_t>(config & 0xFF)
     };
 
-    if (!write_registers(i2c_, ADS1115::CONFIG_REGISTER, bytes, 2)) {
+    if (!write_registers(ADS1115::CONFIG_REGISTER, bytes, 2)) {
         return false;
     }
 
@@ -162,7 +160,7 @@ bool ADS1115Device::update() {
     }
 
     uint8_t buffer[2];
-    if (!read_registers(i2c_, ADS1115::CONVERSION_REGISTER, buffer, 2)) {
+    if (!read_registers(ADS1115::CONVERSION_REGISTER, buffer, 2)) {
         data_.valid = false;
         return false;
     }
@@ -194,32 +192,4 @@ void ADS1115Device::stop_polling() {
         polling_ = false;
         log_device("ADS1115", "Polling stopped");
     }
-}
-
-const ADS1115Device::Data& ADS1115Device::data() const {
-    return data_;
-}
-
-int16_t ADS1115Device::raw() const {
-    return data_.raw;
-}
-
-float ADS1115Device::voltage() const {
-    return data_.voltage;
-}
-
-bool ADS1115Device::valid() const {
-    return data_.valid;
-}
-
-bool ADS1115Device::is_polling() const {
-    return polling_;
-}
-
-bool ADS1115Device::is_converting() const {
-    return converting_;
-}
-
-uint32_t ADS1115Device::errors() const {
-    return error_count_;
 }

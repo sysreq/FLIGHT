@@ -107,6 +107,7 @@
         "cfenv": "cpp",
         "typeinfo": "cpp",
         "valarray": "cpp",
-        "variant": "cpp"
+        "variant": "cpp",
+        "clocks.h": "c"
     }
 }

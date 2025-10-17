@@ -285,30 +285,3 @@ void HX711Device::stop_polling() {
     }
 }
 
-const HX711Device::Data& HX711Device::data() const {
-    return current_data_;
-}
-
-int32_t HX711Device::raw() const {
-    return current_data_.raw;
-}
-
-int32_t HX711Device::tared() const {
-    return current_data_.tared;
-}
-
-float HX711Device::weight() const {
-    return current_data_.weight;
-}
-
-bool HX711Device::valid() const {
-    return current_data_.valid;
-}
-
-bool HX711Device::is_polling() const {
-    return polling_;
-}
-
-uint32_t HX711Device::errors() const {
-    return error_count_;
-}

@@ -2,6 +2,8 @@
 
 #include <cstdint>
 
+#include "hardware/i2c.h"
+
 namespace Config {
 
 namespace HX711 {
@@ -21,6 +23,7 @@ namespace HX711 {
 }
 
 namespace ADS1115 {
+    static constexpr i2c_inst_t* DEVICE_BUS = i2c0;
     static constexpr uint8_t DEVICE_ADDRESS = 0x48;
     static constexpr uint8_t CONVERSION_REGISTER = 0x00;
     static constexpr uint8_t CONFIG_REGISTER = 0x01;

@@ -39,14 +39,14 @@ public:
     bool start_polling(std::function<void(const Data&)> handler);
     void stop_polling();
 
-    const Data& data() const { return current_data_; }
-    int32_t raw() const { return current_data_.raw; }
-    int32_t tared() const { return current_data_.tared; }
-    float weight() const { return current_data_.weight; }
-    bool valid() const { return current_data_.valid; }
+    inline const Data& data() const { return current_data_; }
+    inline int32_t raw() const { return current_data_.raw; }
+    inline int32_t tared() const { return current_data_.tared; }
+    inline float weight() const { return current_data_.weight; }
+    inline bool valid() const { return current_data_.valid; }
 
-    bool is_polling() const { return polling_; }
-    uint32_t errors() const { return error_count_; }
+    inline bool is_polling() const { return polling_; }
+    inline uint32_t errors() const { return error_count_; }
 
 private:
     int32_t tare_offset_;

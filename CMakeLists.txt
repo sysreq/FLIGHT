@@ -33,6 +33,8 @@ pico_sdk_init()
 
 add_executable(${PROJECT_IDENTITY} main.cpp)
 
+add_subdirectory(devices)
+
 pico_set_program_name(${PROJECT_IDENTITY} "FORWARD MODULE")
 pico_set_program_version(${PROJECT_IDENTITY} "1.0")
 
@@ -69,14 +71,14 @@ target_link_libraries(pico_bundle INTERFACE
 
 target_link_libraries(${PROJECT_IDENTITY}
     pico_bundle
+    StandaloneDevices
 )
 
 # Add the standard include files to the build
 target_include_directories(${PROJECT_IDENTITY} PRIVATE
         ${CMAKE_CURRENT_LIST_DIR}
-        ${CMAKE_CURRENT_LIST_DIR}/i2c
-        ${CMAKE_CURRENT_LIST_DIR}/app
-        ${CMAKE_CURRENT_LIST_DIR}/adc
+        ${CMAKE_CURRENT_LIST_DIR}/devices/include
+        ${CMAKE_CURRENT_LIST_DIR}/devices/misc
 )
 
 # Linker options
