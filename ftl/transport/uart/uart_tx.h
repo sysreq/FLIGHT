@@ -1,6 +1,6 @@
 #pragma once
 
-#include "config.settings"
+#include "ftl.settings"
 #include <span>
 #include <string_view>
 #include <cstdint>

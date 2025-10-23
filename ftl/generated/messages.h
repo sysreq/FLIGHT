@@ -14,11 +14,10 @@
 #include "messages_detail.h"
 
 // Include all message type definitions
-#include "messages/MSG_LOG_STRING.h"
-#include "messages/MSG_SENSOR_DATA.h"
+#include "messages/MSG_REMOTE_LOG.h"
 #include "messages/MSG_SYSTEM_STATE.h"
-#include "messages/MSG_CONFIG.h"
-#include "messages/MSG_HEARTBEAT.h"
+#include "messages/MSG_SENSOR_HX711.h"
+#include "messages/MSG_SENSOR_ADS1115.h"
 
 namespace ftl {
 namespace messages {
@@ -53,11 +52,10 @@ namespace messages {
  */
 class Dispatcher {
 private:
-    std::function<void(const MSG_LOG_STRING_View&)> msg_log_string_handler_;
-    std::function<void(const MSG_SENSOR_DATA_View&)> msg_sensor_data_handler_;
+    std::function<void(const MSG_REMOTE_LOG_View&)> msg_remote_log_handler_;
     std::function<void(const MSG_SYSTEM_STATE_View&)> msg_system_state_handler_;
-    std::function<void(const MSG_CONFIG_View&)> msg_config_handler_;
-    std::function<void(const MSG_HEARTBEAT_View&)> msg_heartbeat_handler_;
+    std::function<void(const MSG_SENSOR_HX711_View&)> msg_sensor_hx711_handler_;
+    std::function<void(const MSG_SENSOR_ADS1115_View&)> msg_sensor_ads1115_handler_;
 
 public:
     /**
@@ -73,20 +71,17 @@ public:
     void dispatch(ftl::MessageHandle& handle);
     
     // Handler setters (one for each message type)
-    void set_handler(std::function<void(const MSG_LOG_STRING_View&)> handler) {
-        msg_log_string_handler_ = std::move(handler);
-    }
-    void set_handler(std::function<void(const MSG_SENSOR_DATA_View&)> handler) {
-        msg_sensor_data_handler_ = std::move(handler);
+    void set_handler(std::function<void(const MSG_REMOTE_LOG_View&)> handler) {
+        msg_remote_log_handler_ = std::move(handler);
     }
     void set_handler(std::function<void(const MSG_SYSTEM_STATE_View&)> handler) {
         msg_system_state_handler_ = std::move(handler);
     }
-    void set_handler(std::function<void(const MSG_CONFIG_View&)> handler) {
-        msg_config_handler_ = std::move(handler);
+    void set_handler(std::function<void(const MSG_SENSOR_HX711_View&)> handler) {
+        msg_sensor_hx711_handler_ = std::move(handler);
     }
-    void set_handler(std::function<void(const MSG_HEARTBEAT_View&)> handler) {
-        msg_heartbeat_handler_ = std::move(handler);
+    void set_handler(std::function<void(const MSG_SENSOR_ADS1115_View&)> handler) {
+        msg_sensor_ads1115_handler_ = std::move(handler);
     }
 
     // =============================================================================
@@ -109,20 +104,17 @@ public:
      */
     template<typename MsgType>
     bool send(auto&&... args) {
-if constexpr (std::is_same_v<MsgType, MSG_LOG_STRING>) {
-            return send_msg_log_string(std::forward<decltype(args)>(args)...);
-        }
-else if constexpr (std::is_same_v<MsgType, MSG_SENSOR_DATA>) {
-            return send_msg_sensor_data(std::forward<decltype(args)>(args)...);
+if constexpr (std::is_same_v<MsgType, MSG_REMOTE_LOG>) {
+            return send_msg_remote_log(std::forward<decltype(args)>(args)...);
         }
 else if constexpr (std::is_same_v<MsgType, MSG_SYSTEM_STATE>) {
             return send_msg_system_state(std::forward<decltype(args)>(args)...);
         }
-else if constexpr (std::is_same_v<MsgType, MSG_CONFIG>) {
-            return send_msg_config(std::forward<decltype(args)>(args)...);
+else if constexpr (std::is_same_v<MsgType, MSG_SENSOR_HX711>) {
+            return send_msg_sensor_hx711(std::forward<decltype(args)>(args)...);
         }
-else if constexpr (std::is_same_v<MsgType, MSG_HEARTBEAT>) {
-            return send_msg_heartbeat(std::forward<decltype(args)>(args)...);
+else if constexpr (std::is_same_v<MsgType, MSG_SENSOR_ADS1115>) {
+            return send_msg_sensor_ads1115(std::forward<decltype(args)>(args)...);
         }
         else {
             static_assert(sizeof(MsgType) == 0, "Unknown message type");
@@ -132,11 +124,10 @@ else if constexpr (std::is_same_v<MsgType, MSG_HEARTBEAT>) {
 
 private:
     // Internal send implementations (one per message type)
-    bool send_msg_log_string(std::string_view category, std::string_view message);
-    bool send_msg_sensor_data(uint16_t sensor_id, float temperature, float pressure, float humidity);
+    bool send_msg_remote_log(uint32_t timestamp, std::string_view remote_printf);
     bool send_msg_system_state(uint8_t state_id, bool is_active, uint32_t uptime_ms);
-    bool send_msg_config(std::string_view param_name, uint32_t value);
-    bool send_msg_heartbeat(uint32_t sequence, uint8_t health_status, std::string_view device_name);
+    bool send_msg_sensor_hx711(uint32_t timestamp, uint32_t raw_1, uint32_t raw_2, uint32_t raw_3, uint32_t raw_4, uint32_t raw_5);
+    bool send_msg_sensor_ads1115(uint32_t timestamp, float raw_1, float raw_2, float raw_3, float raw_4, float raw_5);
 };
 
 // =============================================================================
@@ -144,14 +135,9 @@ private:
 // =============================================================================
 
 /**
- * @brief Default print handler for MSG_LOG_STRING
+ * @brief Default print handler for MSG_REMOTE_LOG
  */
-void default_MSG_LOG_STRING_handler(const MSG_LOG_STRING_View& msg);
-
-/**
- * @brief Default print handler for MSG_SENSOR_DATA
- */
-void default_MSG_SENSOR_DATA_handler(const MSG_SENSOR_DATA_View& msg);
+void default_MSG_REMOTE_LOG_handler(const MSG_REMOTE_LOG_View& msg);
 
 /**
  * @brief Default print handler for MSG_SYSTEM_STATE
@@ -159,14 +145,14 @@ void default_MSG_SENSOR_DATA_handler(const MSG_SENSOR_DATA_View& msg);
 void default_MSG_SYSTEM_STATE_handler(const MSG_SYSTEM_STATE_View& msg);
 
 /**
- * @brief Default print handler for MSG_CONFIG
+ * @brief Default print handler for MSG_SENSOR_HX711
  */
-void default_MSG_CONFIG_handler(const MSG_CONFIG_View& msg);
+void default_MSG_SENSOR_HX711_handler(const MSG_SENSOR_HX711_View& msg);
 
 /**
- * @brief Default print handler for MSG_HEARTBEAT
+ * @brief Default print handler for MSG_SENSOR_ADS1115
  */
-void default_MSG_HEARTBEAT_handler(const MSG_HEARTBEAT_View& msg);
+void default_MSG_SENSOR_ADS1115_handler(const MSG_SENSOR_ADS1115_View& msg);
 
 
 } // namespace messages

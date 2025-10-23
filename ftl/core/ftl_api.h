@@ -1,7 +1,7 @@
 #pragma once
 
 #include "util/allocator.h"
-#include "config.settings"
+#include "ftl.settings"
 #include <span>
 #include <cstddef>
 #include <cstdint>

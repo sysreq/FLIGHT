@@ -1,7 +1,7 @@
 #pragma once
 
 #include "util/allocator.h"
-#include "config.settings"
+#include "ftl.settings"
 #include <cstdint>
 
 namespace ftl_internal {

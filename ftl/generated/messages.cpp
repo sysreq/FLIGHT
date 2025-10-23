@@ -16,11 +16,10 @@ namespace messages {
 
 const char* message_type_name(MessageType type) {
     switch (type) {
-    case MessageType::MSG_LOG_STRING: return "MSG_LOG_STRING";
-    case MessageType::MSG_SENSOR_DATA: return "MSG_SENSOR_DATA";
+    case MessageType::MSG_REMOTE_LOG: return "MSG_REMOTE_LOG";
     case MessageType::MSG_SYSTEM_STATE: return "MSG_SYSTEM_STATE";
-    case MessageType::MSG_CONFIG: return "MSG_CONFIG";
-    case MessageType::MSG_HEARTBEAT: return "MSG_HEARTBEAT";
+    case MessageType::MSG_SENSOR_HX711: return "MSG_SENSOR_HX711";
+    case MessageType::MSG_SENSOR_ADS1115: return "MSG_SENSOR_ADS1115";
     case MessageType::INVALID: return "INVALID";
     default: return "UNKNOWN";
     }
@@ -48,27 +47,13 @@ ftl::MessagePoolType& get_message_pool() {
 // Default Print Handlers
 // =============================================================================
 
-void default_MSG_LOG_STRING_handler(const MSG_LOG_STRING_View& msg) {
-    printf("MSG_LOG_STRING: ");
-    printf("category='%.*s'", 
-           static_cast<int>(msg.category().size()), 
-           msg.category().data());
+void default_MSG_REMOTE_LOG_handler(const MSG_REMOTE_LOG_View& msg) {
+    printf("MSG_REMOTE_LOG: ");
+    printf("timestamp=%u", msg.timestamp());
     printf(", ");
-    printf("message='%.*s'", 
-           static_cast<int>(msg.message().size()), 
-           msg.message().data());
-    printf("\n");
-}
-
-void default_MSG_SENSOR_DATA_handler(const MSG_SENSOR_DATA_View& msg) {
-    printf("MSG_SENSOR_DATA: ");
-    printf("sensor_id=%u", msg.sensor_id());
-    printf(", ");
-    printf("temperature=%.2f", msg.temperature());
-    printf(", ");
-    printf("pressure=%.2f", msg.pressure());
-    printf(", ");
-    printf("humidity=%.2f", msg.humidity());
+    printf("remote_printf='%.*s'", 
+           static_cast<int>(msg.remote_printf().size()), 
+           msg.remote_printf().data());
     printf("\n");
 }
 
@@ -82,25 +67,35 @@ void default_MSG_SYSTEM_STATE_handler(const MSG_SYSTEM_STATE_View& msg) {
     printf("\n");
 }
 
-void default_MSG_CONFIG_handler(const MSG_CONFIG_View& msg) {
-    printf("MSG_CONFIG: ");
-    printf("param_name='%.*s'", 
-           static_cast<int>(msg.param_name().size()), 
-           msg.param_name().data());
+void default_MSG_SENSOR_HX711_handler(const MSG_SENSOR_HX711_View& msg) {
+    printf("MSG_SENSOR_HX711: ");
+    printf("timestamp=%u", msg.timestamp());
     printf(", ");
-    printf("value=%u", msg.value());
+    printf("raw_1=%u", msg.raw_1());
+    printf(", ");
+    printf("raw_2=%u", msg.raw_2());
+    printf(", ");
+    printf("raw_3=%u", msg.raw_3());
+    printf(", ");
+    printf("raw_4=%u", msg.raw_4());
+    printf(", ");
+    printf("raw_5=%u", msg.raw_5());
     printf("\n");
 }
 
-void default_MSG_HEARTBEAT_handler(const MSG_HEARTBEAT_View& msg) {
-    printf("MSG_HEARTBEAT: ");
-    printf("sequence=%u", msg.sequence());
+void default_MSG_SENSOR_ADS1115_handler(const MSG_SENSOR_ADS1115_View& msg) {
+    printf("MSG_SENSOR_ADS1115: ");
+    printf("timestamp=%u", msg.timestamp());
     printf(", ");
-    printf("health_status=%u", msg.health_status());
+    printf("raw_1=%.2f", msg.raw_1());
     printf(", ");
-    printf("device_name='%.*s'", 
-           static_cast<int>(msg.device_name().size()), 
-           msg.device_name().data());
+    printf("raw_2=%.2f", msg.raw_2());
+    printf(", ");
+    printf("raw_3=%.2f", msg.raw_3());
+    printf(", ");
+    printf("raw_4=%.2f", msg.raw_4());
+    printf(", ");
+    printf("raw_5=%.2f", msg.raw_5());
     printf("\n");
 }
 
@@ -111,11 +106,10 @@ void default_MSG_HEARTBEAT_handler(const MSG_HEARTBEAT_View& msg) {
 
 Dispatcher::Dispatcher() {
     // Initialize all handlers with defaults
-    msg_log_string_handler_ = default_MSG_LOG_STRING_handler;
-    msg_sensor_data_handler_ = default_MSG_SENSOR_DATA_handler;
+    msg_remote_log_handler_ = default_MSG_REMOTE_LOG_handler;
     msg_system_state_handler_ = default_MSG_SYSTEM_STATE_handler;
-    msg_config_handler_ = default_MSG_CONFIG_handler;
-    msg_heartbeat_handler_ = default_MSG_HEARTBEAT_handler;
+    msg_sensor_hx711_handler_ = default_MSG_SENSOR_HX711_handler;
+    msg_sensor_ads1115_handler_ = default_MSG_SENSOR_ADS1115_handler;
 }
 
 void Dispatcher::dispatch(ftl::MessageHandle& handle) {
@@ -131,25 +125,14 @@ void Dispatcher::dispatch(ftl::MessageHandle& handle) {
     
     // Dispatch to appropriate handler
     switch (type) {
-    case MessageType::MSG_LOG_STRING: {
-        auto result = parse_MSG_LOG_STRING(handle);
+    case MessageType::MSG_REMOTE_LOG: {
+        auto result = parse_MSG_REMOTE_LOG(handle);
         if (result) {
-            if (msg_log_string_handler_) {
-                msg_log_string_handler_(*result);
+            if (msg_remote_log_handler_) {
+                msg_remote_log_handler_(*result);
             }
         } else {
-            printf("Failed to parse MSG_LOG_STRING: %s\n", error_name(result.error()));
-        }
-        break;
-    }
-    case MessageType::MSG_SENSOR_DATA: {
-        auto result = parse_MSG_SENSOR_DATA(handle);
-        if (result) {
-            if (msg_sensor_data_handler_) {
-                msg_sensor_data_handler_(*result);
-            }
-        } else {
-            printf("Failed to parse MSG_SENSOR_DATA: %s\n", error_name(result.error()));
+            printf("Failed to parse MSG_REMOTE_LOG: %s\n", error_name(result.error()));
         }
         break;
     }
@@ -164,25 +147,25 @@ void Dispatcher::dispatch(ftl::MessageHandle& handle) {
         }
         break;
     }
-    case MessageType::MSG_CONFIG: {
-        auto result = parse_MSG_CONFIG(handle);
+    case MessageType::MSG_SENSOR_HX711: {
+        auto result = parse_MSG_SENSOR_HX711(handle);
         if (result) {
-            if (msg_config_handler_) {
-                msg_config_handler_(*result);
+            if (msg_sensor_hx711_handler_) {
+                msg_sensor_hx711_handler_(*result);
             }
         } else {
-            printf("Failed to parse MSG_CONFIG: %s\n", error_name(result.error()));
+            printf("Failed to parse MSG_SENSOR_HX711: %s\n", error_name(result.error()));
         }
         break;
     }
-    case MessageType::MSG_HEARTBEAT: {
-        auto result = parse_MSG_HEARTBEAT(handle);
+    case MessageType::MSG_SENSOR_ADS1115: {
+        auto result = parse_MSG_SENSOR_ADS1115(handle);
         if (result) {
-            if (msg_heartbeat_handler_) {
-                msg_heartbeat_handler_(*result);
+            if (msg_sensor_ads1115_handler_) {
+                msg_sensor_ads1115_handler_(*result);
             }
         } else {
-            printf("Failed to parse MSG_HEARTBEAT: %s\n", error_name(result.error()));
+            printf("Failed to parse MSG_SENSOR_ADS1115: %s\n", error_name(result.error()));
         }
         break;
     }
@@ -197,24 +180,10 @@ void Dispatcher::dispatch(ftl::MessageHandle& handle) {
 // Dispatcher send() Implementations
 // =============================================================================
 
-bool Dispatcher::send_msg_log_string(std::string_view category, std::string_view message) {
-    auto msg = MSG_LOG_STRING::Builder()
-        .category(category)
-        .message(message)
-        .build();
-    
-    if (msg.is_valid()) {
-        return ftl::send_msg(msg.span());
-    }
-    return false;
-}
-
-bool Dispatcher::send_msg_sensor_data(uint16_t sensor_id, float temperature, float pressure, float humidity) {
-    auto msg = MSG_SENSOR_DATA::Builder()
-        .sensor_id(sensor_id)
-        .temperature(temperature)
-        .pressure(pressure)
-        .humidity(humidity)
+bool Dispatcher::send_msg_remote_log(uint32_t timestamp, std::string_view remote_printf) {
+    auto msg = MSG_REMOTE_LOG::Builder()
+        .timestamp(timestamp)
+        .remote_printf(remote_printf)
         .build();
     
     if (msg.is_valid()) {
@@ -236,10 +205,14 @@ bool Dispatcher::send_msg_system_state(uint8_t state_id, bool is_active, uint32_
     return false;
 }
 
-bool Dispatcher::send_msg_config(std::string_view param_name, uint32_t value) {
-    auto msg = MSG_CONFIG::Builder()
-        .param_name(param_name)
-        .value(value)
+bool Dispatcher::send_msg_sensor_hx711(uint32_t timestamp, uint32_t raw_1, uint32_t raw_2, uint32_t raw_3, uint32_t raw_4, uint32_t raw_5) {
+    auto msg = MSG_SENSOR_HX711::Builder()
+        .timestamp(timestamp)
+        .raw_1(raw_1)
+        .raw_2(raw_2)
+        .raw_3(raw_3)
+        .raw_4(raw_4)
+        .raw_5(raw_5)
         .build();
     
     if (msg.is_valid()) {
@@ -248,11 +221,14 @@ bool Dispatcher::send_msg_config(std::string_view param_name, uint32_t value) {
     return false;
 }
 
-bool Dispatcher::send_msg_heartbeat(uint32_t sequence, uint8_t health_status, std::string_view device_name) {
-    auto msg = MSG_HEARTBEAT::Builder()
-        .sequence(sequence)
-        .health_status(health_status)
-        .device_name(device_name)
+bool Dispatcher::send_msg_sensor_ads1115(uint32_t timestamp, float raw_1, float raw_2, float raw_3, float raw_4, float raw_5) {
+    auto msg = MSG_SENSOR_ADS1115::Builder()
+        .timestamp(timestamp)
+        .raw_1(raw_1)
+        .raw_2(raw_2)
+        .raw_3(raw_3)
+        .raw_4(raw_4)
+        .raw_5(raw_5)
         .build();
     
     if (msg.is_valid()) {

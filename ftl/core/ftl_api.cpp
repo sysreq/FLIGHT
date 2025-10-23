@@ -3,7 +3,7 @@
 #include "transport/uart/uart_tx.h"
 #include "transport/uart/dma_control.h"
 #include "util/device_id.h"
-#include "config.settings"
+#include "ftl.settings"
 #include "pico/stdlib.h"
 #include "pico/printf.h"
 #include "hardware/uart.h"

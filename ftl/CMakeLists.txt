@@ -86,9 +86,6 @@ add_dependencies(ftl ftl_generate_messages)
 
 # Include directories
 target_include_directories(ftl PUBLIC
-    # Root directory (so includes like "ftl/core/uart_api.h" work)
-    ${CMAKE_CURRENT_SOURCE_DIR}/..
-
     # FTL directory itself (for internal includes)
     ${CMAKE_CURRENT_SOURCE_DIR}
 

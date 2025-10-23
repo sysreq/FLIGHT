@@ -3,8 +3,8 @@
 #include "messages_detail.h"
 
 /**
- * @file MSG_LOG_STRING.h
- * @brief MSG_LOG_STRING message type
+ * @file MSG_REMOTE_LOG.h
+ * @brief MSG_REMOTE_LOG message type
  *
  * Auto-generated from messages.yaml - Do not edit manually!
  */
@@ -13,51 +13,51 @@ namespace ftl {
 namespace messages {
 
 // =============================================================================
-// MSG_LOG_STRING
+// MSG_REMOTE_LOG
 // =============================================================================
 
-class MSG_LOG_STRING_View;
-class MSG_LOG_STRING_Builder;
+class MSG_REMOTE_LOG_View;
+class MSG_REMOTE_LOG_Builder;
 
 /**
- * @brief MSG_LOG_STRING message container
+ * @brief MSG_REMOTE_LOG message container
  * 
- * Provides nested type access: MSG_LOG_STRING::View and MSG_LOG_STRING::Builder
+ * Provides nested type access: MSG_REMOTE_LOG::View and MSG_REMOTE_LOG::Builder
  */
-class MSG_LOG_STRING {
+class MSG_REMOTE_LOG {
 public:
-    using View = MSG_LOG_STRING_View;
-    using Builder = MSG_LOG_STRING_Builder;
-    static constexpr MessageType TYPE = MessageType::MSG_LOG_STRING;
+    using View = MSG_REMOTE_LOG_View;
+    using Builder = MSG_REMOTE_LOG_Builder;
+    static constexpr MessageType TYPE = MessageType::MSG_REMOTE_LOG;
 };
 
 /**
- * @brief Read-only view of MSG_LOG_STRING message
+ * @brief Read-only view of MSG_REMOTE_LOG message
  * 
  * Zero-copy accessor for received messages.
  * Lifetime is tied to underlying MessageHandle.
  */
-class MSG_LOG_STRING_View {
+class MSG_REMOTE_LOG_View {
 private:
     const uint8_t* data_;
     uint8_t length_;
     
-    friend MessageResult<MSG_LOG_STRING_View> parse_MSG_LOG_STRING(const ftl::MessageHandle&);
+    friend MessageResult<MSG_REMOTE_LOG_View> parse_MSG_REMOTE_LOG(const ftl::MessageHandle&);
     
-    MSG_LOG_STRING_View(const uint8_t* data, uint8_t length)
+    MSG_REMOTE_LOG_View(const uint8_t* data, uint8_t length)
         : data_(data), length_(length) {}
 
 public:
-    static constexpr MessageType TYPE = MessageType::MSG_LOG_STRING;
+    static constexpr MessageType TYPE = MessageType::MSG_REMOTE_LOG;
     
     // Field accessors
-    std::string_view category() const {
+    uint32_t timestamp() const {
         size_t offset = 1;  // Skip message type byte
-        return detail::read_string(data_, offset, length_);
+        return detail::read_primitive<uint32_t>(data_, offset);
     }
-    std::string_view message() const {
+    std::string_view remote_printf() const {
         size_t offset = 1;  // Skip message type byte
-        detail::read_string(data_, offset, length_);  // Skip previous string
+        offset += 4;
         return detail::read_string(data_, offset, length_);
     }
     
@@ -66,12 +66,12 @@ public:
 };
 
 /**
- * @brief Builder for MSG_LOG_STRING message
+ * @brief Builder for MSG_REMOTE_LOG message
  * 
  * Fluent API for constructing messages.
  * Automatically manages MessageHandle lifecycle.
  */
-class MSG_LOG_STRING_Builder {
+class MSG_REMOTE_LOG_Builder {
 private:
     ftl::MessagePoolType::Handle handle_;
     uint8_t* data_;
@@ -83,7 +83,7 @@ private:
     }
 
 public:
-    MSG_LOG_STRING_Builder() 
+    MSG_REMOTE_LOG_Builder() 
         : handle_(get_pool().acquire())
         , data_(nullptr)
         , offset_(3)  // Start after [LENGTH][SOURCE][TYPE]
@@ -94,24 +94,24 @@ public:
             if (data_) {
                 // Buffer layout: [LENGTH][SOURCE][TYPE][FIELDS...]
                 // Length and Source will be filled in build()
-                data_[2] = static_cast<uint8_t>(MessageType::MSG_LOG_STRING);
+                data_[2] = static_cast<uint8_t>(MessageType::MSG_REMOTE_LOG);
             } else {
                 valid_ = false;
             }
         }
     }
     
-    ~MSG_LOG_STRING_Builder() {
+    ~MSG_REMOTE_LOG_Builder() {
         if (handle_ != ftl::MessagePoolType::INVALID && valid_) {
             get_pool().release(handle_);
         }
     }
     
     // Disable copy, enable move
-    MSG_LOG_STRING_Builder(const MSG_LOG_STRING_Builder&) = delete;
-    MSG_LOG_STRING_Builder& operator=(const MSG_LOG_STRING_Builder&) = delete;
+    MSG_REMOTE_LOG_Builder(const MSG_REMOTE_LOG_Builder&) = delete;
+    MSG_REMOTE_LOG_Builder& operator=(const MSG_REMOTE_LOG_Builder&) = delete;
     
-    MSG_LOG_STRING_Builder(MSG_LOG_STRING_Builder&& other) noexcept
+    MSG_REMOTE_LOG_Builder(MSG_REMOTE_LOG_Builder&& other) noexcept
         : handle_(other.handle_)
         , data_(other.data_)
         , offset_(other.offset_)
@@ -121,15 +121,17 @@ public:
         other.valid_ = false;
     }
     
-    MSG_LOG_STRING_Builder& category(std::string_view value) {
+    MSG_REMOTE_LOG_Builder& timestamp(uint32_t value) {
         if (valid_ && data_) {
-            if (!detail::write_string(data_, offset_, ftl_config::MAX_PAYLOAD_SIZE, value)) {
+            if (offset_ + sizeof(uint32_t) <= ftl_config::MAX_PAYLOAD_SIZE) {
+                detail::write_primitive(data_, offset_, value);
+            } else {
                 valid_ = false;
             }
         }
         return *this;
     }
-    MSG_LOG_STRING_Builder& message(std::string_view value) {
+    MSG_REMOTE_LOG_Builder& remote_printf(std::string_view value) {
         if (valid_ && data_) {
             if (!detail::write_string(data_, offset_, ftl_config::MAX_PAYLOAD_SIZE, value)) {
                 valid_ = false;
@@ -175,9 +177,9 @@ public:
 };
 
 /**
- * @brief Parse MSG_LOG_STRING from MessageHandle
+ * @brief Parse MSG_REMOTE_LOG from MessageHandle
  */
-inline MessageResult<MSG_LOG_STRING_View> parse_MSG_LOG_STRING(const ftl::MessageHandle& handle) {
+inline MessageResult<MSG_REMOTE_LOG_View> parse_MSG_REMOTE_LOG(const ftl::MessageHandle& handle) {
     if (!handle.is_valid()) {
         return std::unexpected(MessageError::INVALID_HANDLE);
     }
@@ -190,11 +192,11 @@ inline MessageResult<MSG_LOG_STRING_View> parse_MSG_LOG_STRING(const ftl::Messag
     }
     
     MessageType type = static_cast<MessageType>(data[0]);
-    if (type != MessageType::MSG_LOG_STRING) {
+    if (type != MessageType::MSG_REMOTE_LOG) {
         return std::unexpected(MessageError::WRONG_MESSAGE_TYPE);
     }
     
-    return MSG_LOG_STRING_View(data, length);
+    return MSG_REMOTE_LOG_View(data, length);
 }
 
 } // namespace messages

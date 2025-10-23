@@ -3,8 +3,8 @@
 #include "messages_detail.h"
 
 /**
- * @file MSG_SENSOR_DATA.h
- * @brief MSG_SENSOR_DATA message type
+ * @file MSG_SENSOR_HX711.h
+ * @brief MSG_SENSOR_HX711 message type
  *
  * Auto-generated from messages.yaml - Do not edit manually!
  */
@@ -13,65 +13,82 @@ namespace ftl {
 namespace messages {
 
 // =============================================================================
-// MSG_SENSOR_DATA
+// MSG_SENSOR_HX711
 // =============================================================================
 
-class MSG_SENSOR_DATA_View;
-class MSG_SENSOR_DATA_Builder;
+class MSG_SENSOR_HX711_View;
+class MSG_SENSOR_HX711_Builder;
 
 /**
- * @brief MSG_SENSOR_DATA message container
+ * @brief MSG_SENSOR_HX711 message container
  * 
- * Provides nested type access: MSG_SENSOR_DATA::View and MSG_SENSOR_DATA::Builder
+ * Provides nested type access: MSG_SENSOR_HX711::View and MSG_SENSOR_HX711::Builder
  */
-class MSG_SENSOR_DATA {
+class MSG_SENSOR_HX711 {
 public:
-    using View = MSG_SENSOR_DATA_View;
-    using Builder = MSG_SENSOR_DATA_Builder;
-    static constexpr MessageType TYPE = MessageType::MSG_SENSOR_DATA;
+    using View = MSG_SENSOR_HX711_View;
+    using Builder = MSG_SENSOR_HX711_Builder;
+    static constexpr MessageType TYPE = MessageType::MSG_SENSOR_HX711;
 };
 
 /**
- * @brief Read-only view of MSG_SENSOR_DATA message
+ * @brief Read-only view of MSG_SENSOR_HX711 message
  * 
  * Zero-copy accessor for received messages.
  * Lifetime is tied to underlying MessageHandle.
  */
-class MSG_SENSOR_DATA_View {
+class MSG_SENSOR_HX711_View {
 private:
     const uint8_t* data_;
     uint8_t length_;
     
-    friend MessageResult<MSG_SENSOR_DATA_View> parse_MSG_SENSOR_DATA(const ftl::MessageHandle&);
+    friend MessageResult<MSG_SENSOR_HX711_View> parse_MSG_SENSOR_HX711(const ftl::MessageHandle&);
     
-    MSG_SENSOR_DATA_View(const uint8_t* data, uint8_t length)
+    MSG_SENSOR_HX711_View(const uint8_t* data, uint8_t length)
         : data_(data), length_(length) {}
 
 public:
-    static constexpr MessageType TYPE = MessageType::MSG_SENSOR_DATA;
+    static constexpr MessageType TYPE = MessageType::MSG_SENSOR_HX711;
     
     // Field accessors
-    uint16_t sensor_id() const {
+    uint32_t timestamp() const {
         size_t offset = 1;  // Skip message type byte
-        return detail::read_primitive<uint16_t>(data_, offset);
+        return detail::read_primitive<uint32_t>(data_, offset);
     }
-    float temperature() const {
+    uint32_t raw_1() const {
         size_t offset = 1;  // Skip message type byte
-        offset += 2;
-        return detail::read_primitive<float>(data_, offset);
-    }
-    float pressure() const {
-        size_t offset = 1;  // Skip message type byte
-        offset += 2;
         offset += 4;
-        return detail::read_primitive<float>(data_, offset);
+        return detail::read_primitive<uint32_t>(data_, offset);
     }
-    float humidity() const {
+    uint32_t raw_2() const {
         size_t offset = 1;  // Skip message type byte
-        offset += 2;
         offset += 4;
         offset += 4;
-        return detail::read_primitive<float>(data_, offset);
+        return detail::read_primitive<uint32_t>(data_, offset);
+    }
+    uint32_t raw_3() const {
+        size_t offset = 1;  // Skip message type byte
+        offset += 4;
+        offset += 4;
+        offset += 4;
+        return detail::read_primitive<uint32_t>(data_, offset);
+    }
+    uint32_t raw_4() const {
+        size_t offset = 1;  // Skip message type byte
+        offset += 4;
+        offset += 4;
+        offset += 4;
+        offset += 4;
+        return detail::read_primitive<uint32_t>(data_, offset);
+    }
+    uint32_t raw_5() const {
+        size_t offset = 1;  // Skip message type byte
+        offset += 4;
+        offset += 4;
+        offset += 4;
+        offset += 4;
+        offset += 4;
+        return detail::read_primitive<uint32_t>(data_, offset);
     }
     
     // Get message type
@@ -79,12 +96,12 @@ public:
 };
 
 /**
- * @brief Builder for MSG_SENSOR_DATA message
+ * @brief Builder for MSG_SENSOR_HX711 message
  * 
  * Fluent API for constructing messages.
  * Automatically manages MessageHandle lifecycle.
  */
-class MSG_SENSOR_DATA_Builder {
+class MSG_SENSOR_HX711_Builder {
 private:
     ftl::MessagePoolType::Handle handle_;
     uint8_t* data_;
@@ -96,7 +113,7 @@ private:
     }
 
 public:
-    MSG_SENSOR_DATA_Builder() 
+    MSG_SENSOR_HX711_Builder() 
         : handle_(get_pool().acquire())
         , data_(nullptr)
         , offset_(3)  // Start after [LENGTH][SOURCE][TYPE]
@@ -107,24 +124,24 @@ public:
             if (data_) {
                 // Buffer layout: [LENGTH][SOURCE][TYPE][FIELDS...]
                 // Length and Source will be filled in build()
-                data_[2] = static_cast<uint8_t>(MessageType::MSG_SENSOR_DATA);
+                data_[2] = static_cast<uint8_t>(MessageType::MSG_SENSOR_HX711);
             } else {
                 valid_ = false;
             }
         }
     }
     
-    ~MSG_SENSOR_DATA_Builder() {
+    ~MSG_SENSOR_HX711_Builder() {
         if (handle_ != ftl::MessagePoolType::INVALID && valid_) {
             get_pool().release(handle_);
         }
     }
     
     // Disable copy, enable move
-    MSG_SENSOR_DATA_Builder(const MSG_SENSOR_DATA_Builder&) = delete;
-    MSG_SENSOR_DATA_Builder& operator=(const MSG_SENSOR_DATA_Builder&) = delete;
+    MSG_SENSOR_HX711_Builder(const MSG_SENSOR_HX711_Builder&) = delete;
+    MSG_SENSOR_HX711_Builder& operator=(const MSG_SENSOR_HX711_Builder&) = delete;
     
-    MSG_SENSOR_DATA_Builder(MSG_SENSOR_DATA_Builder&& other) noexcept
+    MSG_SENSOR_HX711_Builder(MSG_SENSOR_HX711_Builder&& other) noexcept
         : handle_(other.handle_)
         , data_(other.data_)
         , offset_(other.offset_)
@@ -134,9 +151,9 @@ public:
         other.valid_ = false;
     }
     
-    MSG_SENSOR_DATA_Builder& sensor_id(uint16_t value) {
+    MSG_SENSOR_HX711_Builder& timestamp(uint32_t value) {
         if (valid_ && data_) {
-            if (offset_ + sizeof(uint16_t) <= ftl_config::MAX_PAYLOAD_SIZE) {
+            if (offset_ + sizeof(uint32_t) <= ftl_config::MAX_PAYLOAD_SIZE) {
                 detail::write_primitive(data_, offset_, value);
             } else {
                 valid_ = false;
@@ -144,9 +161,9 @@ public:
         }
         return *this;
     }
-    MSG_SENSOR_DATA_Builder& temperature(float value) {
+    MSG_SENSOR_HX711_Builder& raw_1(uint32_t value) {
         if (valid_ && data_) {
-            if (offset_ + sizeof(float) <= ftl_config::MAX_PAYLOAD_SIZE) {
+            if (offset_ + sizeof(uint32_t) <= ftl_config::MAX_PAYLOAD_SIZE) {
                 detail::write_primitive(data_, offset_, value);
             } else {
                 valid_ = false;
@@ -154,9 +171,9 @@ public:
         }
         return *this;
     }
-    MSG_SENSOR_DATA_Builder& pressure(float value) {
+    MSG_SENSOR_HX711_Builder& raw_2(uint32_t value) {
         if (valid_ && data_) {
-            if (offset_ + sizeof(float) <= ftl_config::MAX_PAYLOAD_SIZE) {
+            if (offset_ + sizeof(uint32_t) <= ftl_config::MAX_PAYLOAD_SIZE) {
                 detail::write_primitive(data_, offset_, value);
             } else {
                 valid_ = false;
@@ -164,9 +181,29 @@ public:
         }
         return *this;
     }
-    MSG_SENSOR_DATA_Builder& humidity(float value) {
+    MSG_SENSOR_HX711_Builder& raw_3(uint32_t value) {
         if (valid_ && data_) {
-            if (offset_ + sizeof(float) <= ftl_config::MAX_PAYLOAD_SIZE) {
+            if (offset_ + sizeof(uint32_t) <= ftl_config::MAX_PAYLOAD_SIZE) {
+                detail::write_primitive(data_, offset_, value);
+            } else {
+                valid_ = false;
+            }
+        }
+        return *this;
+    }
+    MSG_SENSOR_HX711_Builder& raw_4(uint32_t value) {
+        if (valid_ && data_) {
+            if (offset_ + sizeof(uint32_t) <= ftl_config::MAX_PAYLOAD_SIZE) {
+                detail::write_primitive(data_, offset_, value);
+            } else {
+                valid_ = false;
+            }
+        }
+        return *this;
+    }
+    MSG_SENSOR_HX711_Builder& raw_5(uint32_t value) {
+        if (valid_ && data_) {
+            if (offset_ + sizeof(uint32_t) <= ftl_config::MAX_PAYLOAD_SIZE) {
                 detail::write_primitive(data_, offset_, value);
             } else {
                 valid_ = false;
@@ -212,9 +249,9 @@ public:
 };
 
 /**
- * @brief Parse MSG_SENSOR_DATA from MessageHandle
+ * @brief Parse MSG_SENSOR_HX711 from MessageHandle
  */
-inline MessageResult<MSG_SENSOR_DATA_View> parse_MSG_SENSOR_DATA(const ftl::MessageHandle& handle) {
+inline MessageResult<MSG_SENSOR_HX711_View> parse_MSG_SENSOR_HX711(const ftl::MessageHandle& handle) {
     if (!handle.is_valid()) {
         return std::unexpected(MessageError::INVALID_HANDLE);
     }
@@ -227,11 +264,11 @@ inline MessageResult<MSG_SENSOR_DATA_View> parse_MSG_SENSOR_DATA(const ftl::Mess
     }
     
     MessageType type = static_cast<MessageType>(data[0]);
-    if (type != MessageType::MSG_SENSOR_DATA) {
+    if (type != MessageType::MSG_SENSOR_HX711) {
         return std::unexpected(MessageError::WRONG_MESSAGE_TYPE);
     }
     
-    return MSG_SENSOR_DATA_View(data, length);
+    return MSG_SENSOR_HX711_View(data, length);
 }
 
 } // namespace messages

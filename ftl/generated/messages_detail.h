@@ -23,11 +23,10 @@ namespace messages {
 // =============================================================================
 
 enum class MessageType : uint8_t {
-    MSG_LOG_STRING = 0,
-    MSG_SENSOR_DATA = 1,
-    MSG_SYSTEM_STATE = 2,
-    MSG_CONFIG = 3,
-    MSG_HEARTBEAT = 4,
+    MSG_REMOTE_LOG = 0,
+    MSG_SYSTEM_STATE = 1,
+    MSG_SENSOR_HX711 = 2,
+    MSG_SENSOR_ADS1115 = 3,
     INVALID = 0xFF
 };
 

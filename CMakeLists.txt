@@ -34,6 +34,7 @@ pico_sdk_init()
 add_executable(${PROJECT_IDENTITY} main.cpp)
 
 add_subdirectory(devices)
+add_subdirectory(ftl)
 
 pico_set_program_name(${PROJECT_IDENTITY} "FORWARD MODULE")
 pico_set_program_version(${PROJECT_IDENTITY} "1.0")
@@ -72,6 +73,7 @@ target_link_libraries(pico_bundle INTERFACE
 target_link_libraries(${PROJECT_IDENTITY}
     pico_bundle
     StandaloneDevices
+    ftl
 )
 
 # Add the standard include files to the build

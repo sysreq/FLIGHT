@@ -3,8 +3,8 @@
 #include "messages_detail.h"
 
 /**
- * @file MSG_HEARTBEAT.h
- * @brief MSG_HEARTBEAT message type
+ * @file MSG_SENSOR_ADS1115.h
+ * @brief MSG_SENSOR_ADS1115 message type
  *
  * Auto-generated from messages.yaml - Do not edit manually!
  */
@@ -13,58 +13,82 @@ namespace ftl {
 namespace messages {
 
 // =============================================================================
-// MSG_HEARTBEAT
+// MSG_SENSOR_ADS1115
 // =============================================================================
 
-class MSG_HEARTBEAT_View;
-class MSG_HEARTBEAT_Builder;
+class MSG_SENSOR_ADS1115_View;
+class MSG_SENSOR_ADS1115_Builder;
 
 /**
- * @brief MSG_HEARTBEAT message container
+ * @brief MSG_SENSOR_ADS1115 message container
  * 
- * Provides nested type access: MSG_HEARTBEAT::View and MSG_HEARTBEAT::Builder
+ * Provides nested type access: MSG_SENSOR_ADS1115::View and MSG_SENSOR_ADS1115::Builder
  */
-class MSG_HEARTBEAT {
+class MSG_SENSOR_ADS1115 {
 public:
-    using View = MSG_HEARTBEAT_View;
-    using Builder = MSG_HEARTBEAT_Builder;
-    static constexpr MessageType TYPE = MessageType::MSG_HEARTBEAT;
+    using View = MSG_SENSOR_ADS1115_View;
+    using Builder = MSG_SENSOR_ADS1115_Builder;
+    static constexpr MessageType TYPE = MessageType::MSG_SENSOR_ADS1115;
 };
 
 /**
- * @brief Read-only view of MSG_HEARTBEAT message
+ * @brief Read-only view of MSG_SENSOR_ADS1115 message
  * 
  * Zero-copy accessor for received messages.
  * Lifetime is tied to underlying MessageHandle.
  */
-class MSG_HEARTBEAT_View {
+class MSG_SENSOR_ADS1115_View {
 private:
     const uint8_t* data_;
     uint8_t length_;
     
-    friend MessageResult<MSG_HEARTBEAT_View> parse_MSG_HEARTBEAT(const ftl::MessageHandle&);
+    friend MessageResult<MSG_SENSOR_ADS1115_View> parse_MSG_SENSOR_ADS1115(const ftl::MessageHandle&);
     
-    MSG_HEARTBEAT_View(const uint8_t* data, uint8_t length)
+    MSG_SENSOR_ADS1115_View(const uint8_t* data, uint8_t length)
         : data_(data), length_(length) {}
 
 public:
-    static constexpr MessageType TYPE = MessageType::MSG_HEARTBEAT;
+    static constexpr MessageType TYPE = MessageType::MSG_SENSOR_ADS1115;
     
     // Field accessors
-    uint32_t sequence() const {
+    uint32_t timestamp() const {
         size_t offset = 1;  // Skip message type byte
         return detail::read_primitive<uint32_t>(data_, offset);
     }
-    uint8_t health_status() const {
+    float raw_1() const {
         size_t offset = 1;  // Skip message type byte
         offset += 4;
-        return detail::read_primitive<uint8_t>(data_, offset);
+        return detail::read_primitive<float>(data_, offset);
     }
-    std::string_view device_name() const {
+    float raw_2() const {
         size_t offset = 1;  // Skip message type byte
         offset += 4;
-        offset += 1;
-        return detail::read_string(data_, offset, length_);
+        offset += 4;
+        return detail::read_primitive<float>(data_, offset);
+    }
+    float raw_3() const {
+        size_t offset = 1;  // Skip message type byte
+        offset += 4;
+        offset += 4;
+        offset += 4;
+        return detail::read_primitive<float>(data_, offset);
+    }
+    float raw_4() const {
+        size_t offset = 1;  // Skip message type byte
+        offset += 4;
+        offset += 4;
+        offset += 4;
+        offset += 4;
+        return detail::read_primitive<float>(data_, offset);
+    }
+    float raw_5() const {
+        size_t offset = 1;  // Skip message type byte
+        offset += 4;
+        offset += 4;
+        offset += 4;
+        offset += 4;
+        offset += 4;
+        return detail::read_primitive<float>(data_, offset);
     }
     
     // Get message type
@@ -72,12 +96,12 @@ public:
 };
 
 /**
- * @brief Builder for MSG_HEARTBEAT message
+ * @brief Builder for MSG_SENSOR_ADS1115 message
  * 
  * Fluent API for constructing messages.
  * Automatically manages MessageHandle lifecycle.
  */
-class MSG_HEARTBEAT_Builder {
+class MSG_SENSOR_ADS1115_Builder {
 private:
     ftl::MessagePoolType::Handle handle_;
     uint8_t* data_;
@@ -89,7 +113,7 @@ private:
     }
 
 public:
-    MSG_HEARTBEAT_Builder() 
+    MSG_SENSOR_ADS1115_Builder() 
         : handle_(get_pool().acquire())
         , data_(nullptr)
         , offset_(3)  // Start after [LENGTH][SOURCE][TYPE]
@@ -100,24 +124,24 @@ public:
             if (data_) {
                 // Buffer layout: [LENGTH][SOURCE][TYPE][FIELDS...]
                 // Length and Source will be filled in build()
-                data_[2] = static_cast<uint8_t>(MessageType::MSG_HEARTBEAT);
+                data_[2] = static_cast<uint8_t>(MessageType::MSG_SENSOR_ADS1115);
             } else {
                 valid_ = false;
             }
         }
     }
     
-    ~MSG_HEARTBEAT_Builder() {
+    ~MSG_SENSOR_ADS1115_Builder() {
         if (handle_ != ftl::MessagePoolType::INVALID && valid_) {
             get_pool().release(handle_);
         }
     }
     
     // Disable copy, enable move
-    MSG_HEARTBEAT_Builder(const MSG_HEARTBEAT_Builder&) = delete;
-    MSG_HEARTBEAT_Builder& operator=(const MSG_HEARTBEAT_Builder&) = delete;
+    MSG_SENSOR_ADS1115_Builder(const MSG_SENSOR_ADS1115_Builder&) = delete;
+    MSG_SENSOR_ADS1115_Builder& operator=(const MSG_SENSOR_ADS1115_Builder&) = delete;
     
-    MSG_HEARTBEAT_Builder(MSG_HEARTBEAT_Builder&& other) noexcept
+    MSG_SENSOR_ADS1115_Builder(MSG_SENSOR_ADS1115_Builder&& other) noexcept
         : handle_(other.handle_)
         , data_(other.data_)
         , offset_(other.offset_)
@@ -127,7 +151,7 @@ public:
         other.valid_ = false;
     }
     
-    MSG_HEARTBEAT_Builder& sequence(uint32_t value) {
+    MSG_SENSOR_ADS1115_Builder& timestamp(uint32_t value) {
         if (valid_ && data_) {
             if (offset_ + sizeof(uint32_t) <= ftl_config::MAX_PAYLOAD_SIZE) {
                 detail::write_primitive(data_, offset_, value);
@@ -137,9 +161,9 @@ public:
         }
         return *this;
     }
-    MSG_HEARTBEAT_Builder& health_status(uint8_t value) {
+    MSG_SENSOR_ADS1115_Builder& raw_1(float value) {
         if (valid_ && data_) {
-            if (offset_ + sizeof(uint8_t) <= ftl_config::MAX_PAYLOAD_SIZE) {
+            if (offset_ + sizeof(float) <= ftl_config::MAX_PAYLOAD_SIZE) {
                 detail::write_primitive(data_, offset_, value);
             } else {
                 valid_ = false;
@@ -147,9 +171,41 @@ public:
         }
         return *this;
     }
-    MSG_HEARTBEAT_Builder& device_name(std::string_view value) {
+    MSG_SENSOR_ADS1115_Builder& raw_2(float value) {
         if (valid_ && data_) {
-            if (!detail::write_string(data_, offset_, ftl_config::MAX_PAYLOAD_SIZE, value)) {
+            if (offset_ + sizeof(float) <= ftl_config::MAX_PAYLOAD_SIZE) {
+                detail::write_primitive(data_, offset_, value);
+            } else {
+                valid_ = false;
+            }
+        }
+        return *this;
+    }
+    MSG_SENSOR_ADS1115_Builder& raw_3(float value) {
+        if (valid_ && data_) {
+            if (offset_ + sizeof(float) <= ftl_config::MAX_PAYLOAD_SIZE) {
+                detail::write_primitive(data_, offset_, value);
+            } else {
+                valid_ = false;
+            }
+        }
+        return *this;
+    }
+    MSG_SENSOR_ADS1115_Builder& raw_4(float value) {
+        if (valid_ && data_) {
+            if (offset_ + sizeof(float) <= ftl_config::MAX_PAYLOAD_SIZE) {
+                detail::write_primitive(data_, offset_, value);
+            } else {
+                valid_ = false;
+            }
+        }
+        return *this;
+    }
+    MSG_SENSOR_ADS1115_Builder& raw_5(float value) {
+        if (valid_ && data_) {
+            if (offset_ + sizeof(float) <= ftl_config::MAX_PAYLOAD_SIZE) {
+                detail::write_primitive(data_, offset_, value);
+            } else {
                 valid_ = false;
             }
         }
@@ -193,9 +249,9 @@ public:
 };
 
 /**
- * @brief Parse MSG_HEARTBEAT from MessageHandle
+ * @brief Parse MSG_SENSOR_ADS1115 from MessageHandle
  */
-inline MessageResult<MSG_HEARTBEAT_View> parse_MSG_HEARTBEAT(const ftl::MessageHandle& handle) {
+inline MessageResult<MSG_SENSOR_ADS1115_View> parse_MSG_SENSOR_ADS1115(const ftl::MessageHandle& handle) {
     if (!handle.is_valid()) {
         return std::unexpected(MessageError::INVALID_HANDLE);
     }
@@ -208,11 +264,11 @@ inline MessageResult<MSG_HEARTBEAT_View> parse_MSG_HEARTBEAT(const ftl::MessageH
     }
     
     MessageType type = static_cast<MessageType>(data[0]);
-    if (type != MessageType::MSG_HEARTBEAT) {
+    if (type != MessageType::MSG_SENSOR_ADS1115) {
         return std::unexpected(MessageError::WRONG_MESSAGE_TYPE);
     }
     
-    return MSG_HEARTBEAT_View(data, length);
+    return MSG_SENSOR_ADS1115_View(data, length);
 }
 
 } // namespace messages
