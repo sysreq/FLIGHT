@@ -96,12 +96,14 @@ inline std::string_view read_string(const uint8_t* data, size_t& offset, size_t 
 
 // Write length-prefixed string
 inline bool write_string(uint8_t* data, size_t& offset, size_t max_len, std::string_view str) {
-    if (str.size() > 255) return false;
-    if (offset + 1 + str.size() > max_len) return false;
+    const size_t str_size = str.size() + 1; // include null terminator
+    if (str_size > 255) return false;
+    if (offset + 1 + str_size > max_len) return false;
     
     data[offset++] = static_cast<uint8_t>(str.size());
-    std::memcpy(data + offset, str.data(), str.size());
-    offset += str.size();
+    std::memcpy(data + offset, str.data(), str_size);
+    offset += str_size;
+    data[offset - 1] = '\0'; // null terminator
     return true;
 }
 

@@ -66,8 +66,19 @@ size_t DmaController::read_from_circular_buffer(std::span<uint8_t> buffer) {
 }
 
 bool DmaController::write_data(std::span<const uint8_t> data) {
-    if (tx_busy_.load(std::memory_order_relaxed) || data.size() > ftl_config::TX_BUFFER_SIZE) {
+    if(data.size() > ftl_config::TX_BUFFER_SIZE) {
         return false;
+    }
+    
+    uint32_t loop_counter = 0;
+    while(true) {
+        if (!is_write_busy()) 
+            break;
+        loop_counter++;
+        if(loop_counter > 1000) {
+            printf("TX DMA busy timeout\n");
+            return false;
+        }  
     }
 
     memcpy(tx_buffer_.data(), data.data(), data.size());

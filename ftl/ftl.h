@@ -43,8 +43,8 @@
 // Core FTL API
 #include "core/ftl_api.h"
 
+// Configuration (users may want to reference ftl_config constants)
+#include "ftl.settings"
+
 // Generated message types and dispatcher
 #include "generated/messages.h"
-
-// Configuration (users may want to reference ftl_config constants)
-#include "config.settings"

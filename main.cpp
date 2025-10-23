@@ -1,12 +1,18 @@
 #include "pico/stdlib.h"
 #include "pico/stdio.h"
-#include "pico/multicore.h"
 #include "pico/bootrom.h"
 #include "hardware/resets.h"
 
+#ifndef MOCK_MODULE
+#include "pico/multicore.h"
 #include "app/Core0Controller.h"
 #include "app/Core1Controller.h"
+#else
+#include "ftl/ftl.h"
+#endif
 
+#ifndef MOCK_MODULE
+// ========== FORWARD MODULE ==========
 // Create the controller instances for each core
 static Core0Controller core0_controller;
 static Core1Controller core1_controller;
@@ -52,3 +58,44 @@ int main() {
     reset_usb_boot(0, 0);
     return 0;
 }
+
+#else
+// ========== MOCK MODULE ==========
+int main() {
+    stdio_init_all();
+    sleep_ms(3000);
+
+    printf("MockModule: FTL Integration Test\n");
+    ftl::initialize();
+
+    ftl::messages::Dispatcher dispatcher;
+    dispatcher.set_handler([](const ftl::messages::MSG_REMOTE_LOG_View& msg) {
+        printf("[RX] LOG: %s\n", msg.remote_printf().data());
+    });
+    dispatcher.set_handler([](const ftl::messages::MSG_SYSTEM_STATE_View& msg) {
+        printf("[RX] STATE: id=%d active=%d uptime=%u\n", msg.state_id(), msg.is_active(), msg.uptime_ms());
+    });
+    dispatcher.set_handler([](const ftl::messages::MSG_SENSOR_HX711_View& msg) {
+        printf("[RX] HX711: timestamp=%u, values=[\n", msg.timestamp());
+        printf("  %li,\n", msg.raw_1());
+        printf("  %li,\n", msg.raw_2());
+        printf("  %li,\n", msg.raw_3());
+        printf("  %li,\n", msg.raw_4());
+        printf("  %li,\n", msg.raw_5());
+        printf("]\n");
+    });
+
+    uint32_t counter = 0;
+    while (true) {
+        ftl::poll();
+        while (ftl::has_msg()) {
+            auto msg = ftl::get_msg();
+            printf("[MockModule] Received message of type %u\n", msg.data()[0]);
+            dispatcher.dispatch(msg);
+        }
+
+        sleep_ms(10);
+        counter++;
+    }
+}
+#endif

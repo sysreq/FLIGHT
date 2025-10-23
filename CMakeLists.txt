@@ -33,6 +33,10 @@ pico_sdk_init()
 
 add_executable(${PROJECT_IDENTITY} main.cpp)
 
+# Mock module for FTL testing
+add_executable(MOCK_MODULE main.cpp)
+target_compile_definitions(MOCK_MODULE PRIVATE MOCK_MODULE)
+
 add_subdirectory(devices)
 add_subdirectory(ftl)
 
@@ -41,6 +45,12 @@ pico_set_program_version(${PROJECT_IDENTITY} "1.0")
 
 pico_enable_stdio_uart(${PROJECT_IDENTITY} 0)
 pico_enable_stdio_usb(${PROJECT_IDENTITY} 1)
+
+pico_set_program_name(MOCK_MODULE "MOCK MODULE")
+pico_set_program_version(MOCK_MODULE "1.0")
+
+pico_enable_stdio_uart(MOCK_MODULE 0)
+pico_enable_stdio_usb(MOCK_MODULE 1)
 
 # Create a bundled interface library for all Pico SDK components
 add_library(pico_bundle INTERFACE)
@@ -76,11 +86,20 @@ target_link_libraries(${PROJECT_IDENTITY}
     ftl
 )
 
+target_link_libraries(MOCK_MODULE
+    pico_bundle
+    ftl
+)
+
 # Add the standard include files to the build
 target_include_directories(${PROJECT_IDENTITY} PRIVATE
         ${CMAKE_CURRENT_LIST_DIR}
         ${CMAKE_CURRENT_LIST_DIR}/devices/include
         ${CMAKE_CURRENT_LIST_DIR}/devices/misc
+)
+
+target_include_directories(MOCK_MODULE PRIVATE
+        ${CMAKE_CURRENT_LIST_DIR}
 )
 
 # Linker options
@@ -92,5 +111,14 @@ target_link_options(${PROJECT_IDENTITY} PRIVATE
     -Wl,-Map=${PROJECT_IDENTITY}.map
 )
 
+target_link_options(MOCK_MODULE PRIVATE
+    -Wl,--gc-sections
+    -Wl,--print-memory-usage
+    -Wl,--no-wchar-size-warning
+    -Wl,--cref
+    -Wl,-Map=MOCK_MODULE.map
+)
+
 pico_add_extra_outputs(${PROJECT_IDENTITY})
+pico_add_extra_outputs(MOCK_MODULE)
 

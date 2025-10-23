@@ -61,7 +61,7 @@ void initialize() {
 
     g_is_initialized = true;
     
-    printf("UART initialized with source ID: 0x%02X", source_id);
+    printf("UART initialized with source ID: 0x%02X\n", source_id);
 }
 
 void poll() {

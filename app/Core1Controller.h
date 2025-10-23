@@ -15,9 +15,27 @@ private:
     ADS1115Device ads1115_;
     
     void poll_hx711() {
+        static std::array<uint32_t, 5> hx711_readings{};
+        static size_t index = 0;
+
         scale_.update();
         if (scale_.valid()) {
             printf("Scale Data: %.2f [Raw: %d, Tared: %d]\n", scale_.weight(), scale_.raw(), scale_.tared());
+
+            hx711_readings[index] = static_cast<uint32_t>(scale_.raw());
+            index = (index + 1) % hx711_readings.size();
+
+            if(index == 0) {
+                ftl::messages::Dispatcher dispatcher;
+                dispatcher.send<ftl::messages::MSG_SENSOR_HX711>(to_ms_since_boot(get_absolute_time()),
+                    hx711_readings[0],
+                    hx711_readings[1],
+                    hx711_readings[2],
+                    hx711_readings[3],
+                    hx711_readings[4]
+                );
+            }
+
         }
     }
 
@@ -39,9 +57,9 @@ private:
         printf("Core 1: Initializing...\n");
 
         QUIT_ON_FAILURE(scale_.init(), "HX711");
-        QUIT_ON_FAILURE(ads1115_.init(), "ADS1115");
-        QUIT_ON_FAILURE(ads1115_.start_polling([this](const ADS1115Device::Data& data)
-            { this->on_ads1115_data(data); }), "ADS1115 polling");
+        // QUIT_ON_FAILURE(ads1115_.init(), "ADS1115");
+        // QUIT_ON_FAILURE(ads1115_.start_polling([this](const ADS1115Device::Data& data)
+        //     { this->on_ads1115_data(data); }), "ADS1115 polling");
 
         add_task(&Core1Controller::poll_hx711, 50);
 
