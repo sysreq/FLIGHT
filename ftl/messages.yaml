@@ -1,0 +1,38 @@
+# messages.yaml
+# Message definitions for UART protocol
+# Strings are automatically length-prefixed (uint8_t length + data)
+
+messages:
+  # Logging message with two strings
+  - name: MSG_LOG_STRING
+    fields:
+      - { type: "string", name: "category" }
+      - { type: "string", name: "message" }
+
+  # Sensor telemetry
+  - name: MSG_SENSOR_DATA
+    fields:
+      - { type: "uint16_t", name: "sensor_id" }
+      - { type: "float", name: "temperature" }
+      - { type: "float", name: "pressure" }
+      - { type: "float", name: "humidity" }
+
+  # System state update
+  - name: MSG_SYSTEM_STATE
+    fields:
+      - { type: "uint8_t", name: "state_id" }
+      - { type: "bool", name: "is_active" }
+      - { type: "uint32_t", name: "uptime_ms" }
+
+  # Configuration command
+  - name: MSG_CONFIG
+    fields:
+      - { type: "string", name: "param_name" }
+      - { type: "uint32_t", name: "value" }
+
+  # Heartbeat with device info
+  - name: MSG_HEARTBEAT
+    fields:
+      - { type: "uint32_t", name: "sequence" }
+      - { type: "uint8_t", name: "health_status" }
+      - { type: "string", name: "device_name" }
