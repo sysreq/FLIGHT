@@ -72,15 +72,15 @@ void default_MSG_SENSOR_HX711_handler(const MSG_SENSOR_HX711_View& msg) {
     printf("MSG_SENSOR_HX711: ");
     printf("timestamp=%u", msg.timestamp());
     printf(", ");
-    printf("raw_1=%u", msg.raw_1());
-    printf(", ");
-    printf("raw_2=%u", msg.raw_2());
-    printf(", ");
-    printf("raw_3=%u", msg.raw_3());
-    printf(", ");
-    printf("raw_4=%u", msg.raw_4());
-    printf(", ");
-    printf("raw_5=%u", msg.raw_5());
+    {
+        auto arr = msg.samples();
+        printf("samples=[");
+        for (size_t i = 0; i < arr.size(); ++i) {
+            printf("%u", arr[i]);
+            if (i < arr.size() - 1) printf(", ");
+        }
+        printf("]");
+    }
     printf("\n");
 }
 
@@ -206,14 +206,10 @@ bool Dispatcher::send_msg_system_state(uint8_t state_id, bool is_active, uint32_
     return false;
 }
 
-bool Dispatcher::send_msg_sensor_hx711(uint32_t timestamp, uint32_t raw_1, uint32_t raw_2, uint32_t raw_3, uint32_t raw_4, uint32_t raw_5) {
+bool Dispatcher::send_msg_sensor_hx711(uint32_t timestamp, std::span<const uint32_t> samples) {
     auto msg = MSG_SENSOR_HX711::Builder()
         .timestamp(timestamp)
-        .raw_1(raw_1)
-        .raw_2(raw_2)
-        .raw_3(raw_3)
-        .raw_4(raw_4)
-        .raw_5(raw_5)
+        .samples(samples)
         .build();
     
     if (msg.is_valid()) {

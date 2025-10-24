@@ -15,7 +15,8 @@ private:
     ADS1115Device ads1115_;
     
     void poll_hx711() {
-        static std::array<uint32_t, 5> hx711_readings{};
+        static constexpr size_t NUM_READINGS = 10;
+        static std::array<uint32_t, NUM_READINGS> hx711_readings{};
         static size_t index = 0;
 
         scale_.update();
@@ -27,13 +28,7 @@ private:
 
             if(index == 0) {
                 ftl::messages::Dispatcher dispatcher;
-                dispatcher.send<ftl::messages::MSG_SENSOR_HX711>(to_ms_since_boot(get_absolute_time()),
-                    hx711_readings[0],
-                    hx711_readings[1],
-                    hx711_readings[2],
-                    hx711_readings[3],
-                    hx711_readings[4]
-                );
+                dispatcher.send<ftl::messages::MSG_SENSOR_HX711>(to_ms_since_boot(get_absolute_time()), hx711_readings);
             }
 
         }

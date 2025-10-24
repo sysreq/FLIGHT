@@ -19,11 +19,7 @@ messages:
   - name: MSG_SENSOR_HX711
     fields:
       - { type: "uint32_t", name: "timestamp" }
-      - { type: "uint32_t", name: "raw_1" }
-      - { type: "uint32_t", name: "raw_2" }
-      - { type: "uint32_t", name: "raw_3" }
-      - { type: "uint32_t", name: "raw_4" }
-      - { type: "uint32_t", name: "raw_5" }
+      - { type: "uint32_t[10]", name: "samples" }
 
   # Sensor telemetry
   - name: MSG_SENSOR_ADS1115

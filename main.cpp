@@ -77,11 +77,9 @@ int main() {
     });
     dispatcher.set_handler([](const ftl::messages::MSG_SENSOR_HX711_View& msg) {
         printf("[RX] HX711: timestamp=%u, values=[\n", msg.timestamp());
-        printf("  %li,\n", msg.raw_1());
-        printf("  %li,\n", msg.raw_2());
-        printf("  %li,\n", msg.raw_3());
-        printf("  %li,\n", msg.raw_4());
-        printf("  %li,\n", msg.raw_5());
+        for (auto val : msg.samples()) {
+            printf(" \t%u,\n", val);
+        }
         printf("]\n");
     });
 

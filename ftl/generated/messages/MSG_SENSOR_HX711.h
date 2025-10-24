@@ -55,40 +55,10 @@ public:
         size_t offset = 1;  // Skip message type byte
         return detail::read_primitive<uint32_t>(data_, offset);
     }
-    uint32_t raw_1() const {
+    std::span<const uint32_t> samples() const {
         size_t offset = 1;  // Skip message type byte
         offset += 4;
-        return detail::read_primitive<uint32_t>(data_, offset);
-    }
-    uint32_t raw_2() const {
-        size_t offset = 1;  // Skip message type byte
-        offset += 4;
-        offset += 4;
-        return detail::read_primitive<uint32_t>(data_, offset);
-    }
-    uint32_t raw_3() const {
-        size_t offset = 1;  // Skip message type byte
-        offset += 4;
-        offset += 4;
-        offset += 4;
-        return detail::read_primitive<uint32_t>(data_, offset);
-    }
-    uint32_t raw_4() const {
-        size_t offset = 1;  // Skip message type byte
-        offset += 4;
-        offset += 4;
-        offset += 4;
-        offset += 4;
-        return detail::read_primitive<uint32_t>(data_, offset);
-    }
-    uint32_t raw_5() const {
-        size_t offset = 1;  // Skip message type byte
-        offset += 4;
-        offset += 4;
-        offset += 4;
-        offset += 4;
-        offset += 4;
-        return detail::read_primitive<uint32_t>(data_, offset);
+        return detail::read_array<uint32_t, 10>(data_, offset, length_);
     }
     
     // Get message type
@@ -161,55 +131,19 @@ public:
         }
         return *this;
     }
-    MSG_SENSOR_HX711_Builder& raw_1(uint32_t value) {
+    // Accept std::span<const uint32_t>
+    MSG_SENSOR_HX711_Builder& samples(std::span<const uint32_t> values) {
         if (valid_ && data_) {
-            if (offset_ + sizeof(uint32_t) <= ftl_config::MAX_PAYLOAD_SIZE) {
-                detail::write_primitive(data_, offset_, value);
-            } else {
+            if (!detail::write_array<uint32_t, 10>(data_, offset_, ftl_config::MAX_PAYLOAD_SIZE, values)) {
                 valid_ = false;
             }
         }
         return *this;
     }
-    MSG_SENSOR_HX711_Builder& raw_2(uint32_t value) {
-        if (valid_ && data_) {
-            if (offset_ + sizeof(uint32_t) <= ftl_config::MAX_PAYLOAD_SIZE) {
-                detail::write_primitive(data_, offset_, value);
-            } else {
-                valid_ = false;
-            }
-        }
-        return *this;
-    }
-    MSG_SENSOR_HX711_Builder& raw_3(uint32_t value) {
-        if (valid_ && data_) {
-            if (offset_ + sizeof(uint32_t) <= ftl_config::MAX_PAYLOAD_SIZE) {
-                detail::write_primitive(data_, offset_, value);
-            } else {
-                valid_ = false;
-            }
-        }
-        return *this;
-    }
-    MSG_SENSOR_HX711_Builder& raw_4(uint32_t value) {
-        if (valid_ && data_) {
-            if (offset_ + sizeof(uint32_t) <= ftl_config::MAX_PAYLOAD_SIZE) {
-                detail::write_primitive(data_, offset_, value);
-            } else {
-                valid_ = false;
-            }
-        }
-        return *this;
-    }
-    MSG_SENSOR_HX711_Builder& raw_5(uint32_t value) {
-        if (valid_ && data_) {
-            if (offset_ + sizeof(uint32_t) <= ftl_config::MAX_PAYLOAD_SIZE) {
-                detail::write_primitive(data_, offset_, value);
-            } else {
-                valid_ = false;
-            }
-        }
-        return *this;
+    
+    // Accept std::array<uint32_t, 10>
+    MSG_SENSOR_HX711_Builder& samples(const std::array<uint32_t, 10>& values) {
+        return samples(std::span<const uint32_t>(values.data(), 10));
     }
     
     /**
