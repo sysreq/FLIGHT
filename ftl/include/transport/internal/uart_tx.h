@@ -1,6 +1,7 @@
 #pragma once
 
 #include "ftl.settings"
+#include "util/allocator.h"
 #include <span>
 #include <string_view>
 #include <cstdint>
@@ -11,7 +12,11 @@ namespace ftl_internal {
 
 namespace ftl {
 
-namespace tx {
+using MessagePoolType = MessagePool<ftl_config::MAX_MESSAGE_SIZE, ftl_config::MESSAGE_POOL_SIZE>;
+using PoolHandle = MessagePoolType::Handle;
+
+namespace uart {
+namespace internal_tx {
 
 /**
  * @brief TX queue statistics
@@ -32,25 +37,28 @@ struct Statistics {
 void initialize(uint8_t source_id);
 
 /**
- * @brief Queue a message for transmission (non-blocking)
+ * @brief Acquire a pool handle and fill it with payload
  * 
- * Message is queued and will be transmitted during next poll() call.
- * Returns immediately without waiting for DMA.
+ * This is the first step of sending a message - it allocates a handle
+ * from the message pool and copies the payload into it.
+ * Used by both Core 0 and Core 1 paths.
  * 
- * @param dma_controller DMA controller instance
- * @param payload Message payload to send
- * @return true if queued successfully, false if queue full
+ * @param payload Message payload to copy
+ * @return PoolHandle if successful, INVALID if pool exhausted
  */
-bool send_message(ftl_internal::DmaController& dma_controller, std::span<const uint8_t> payload);
+PoolHandle acquire_and_fill_message(std::span<const uint8_t> payload);
 
 /**
- * @brief Queue a string message for transmission (non-blocking)
+ * @brief Enqueue a pre-filled handle to Core 0's TX queue
  * 
- * @param dma_controller DMA controller instance
- * @param message String message to send
+ * This is the second step - it takes an already-filled handle and
+ * queues it for transmission. Called from Core 0's send path and
+ * from the multicore FIFO processor.
+ * 
+ * @param handle Pre-filled pool handle
  * @return true if queued successfully, false if queue full
  */
-bool send_message(ftl_internal::DmaController& dma_controller, std::string_view message);
+bool enqueue_message_on_core0(PoolHandle handle);
 
 /**
  * @brief Process TX queue and start DMA transfers when ready
@@ -97,5 +105,6 @@ bool is_queue_empty();
  */
 uint32_t get_queue_count();
 
-} // namespace tx
+} // namespace internal_tx
+} // namespace uart
 } // namespace ftl

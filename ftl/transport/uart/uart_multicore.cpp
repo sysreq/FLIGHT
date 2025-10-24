@@ -1,16 +1,16 @@
-#include "transport/uart/multicore_tx.h"
+#include "internal/uart_multicore.h"
+#include "internal/uart_tx.h"
 #include "core/ftl_api.h"
-#include "util/allocator.h"
 #include "pico/multicore.h"
 #include "pico/printf.h"
-#include <cstring>
 
 namespace ftl {
 namespace messages {
     extern MessagePoolType g_message_pool;
 }
 
-namespace multicore {
+namespace uart {
+namespace internal_multicore {
 
 namespace {
 
@@ -18,6 +18,7 @@ namespace {
 uint32_t g_core1_sent = 0;
 uint32_t g_core1_fifo_drops = 0;
 uint32_t g_core0_received = 0;
+uint32_t g_core0_tx_queue_drops = 0;
 
 bool g_is_initialized = false;
 
@@ -26,15 +27,9 @@ bool g_is_initialized = false;
  * 
  * We send two 32-bit words through the FIFO:
  * Word 0: [pool_handle (8 bits)] [payload_length (8 bits)] [reserved (16 bits)]
- * Word 1: [magic (32 bits)] = 0xFTL_MSG (for validation)
+ * Word 1: [magic (32 bits)] = 0x46544C4D (for validation)
  */
 constexpr uint32_t FIFO_MAGIC = 0x46544C4D;  // "FTLM" in ASCII
-
-struct FifoMessage {
-    uint8_t handle;
-    uint8_t length;
-    uint16_t reserved;
-};
 
 /**
  * @brief Pack FIFO message into two 32-bit words
@@ -72,43 +67,29 @@ void initialize() {
     g_core1_sent = 0;
     g_core1_fifo_drops = 0;
     g_core0_received = 0;
+    g_core0_tx_queue_drops = 0;
     
     g_is_initialized = true;
     
     printf("Multicore TX initialized\n");
 }
 
-bool send_from_core1(std::span<const uint8_t> payload) {
+bool send_from_core1(PoolHandle handle, uint8_t length) {
     if (!g_is_initialized) {
         return false;
     }
     
-    if (payload.empty() || payload.size() > ftl_config::MAX_PAYLOAD_SIZE) {
-        return false;
-    }
-    
-    // Acquire handle from pool
-    PoolHandle handle = messages::g_message_pool.acquire();
     if (handle == MessagePoolType::INVALID) {
         return false;
     }
     
-    // Get buffer pointer
-    uint8_t* buffer = messages::g_message_pool.get_ptr<uint8_t>(handle);
-    if (!buffer) {
-        messages::g_message_pool.release(handle);
+    if (length == 0 || length > ftl_config::MAX_PAYLOAD_SIZE) {
         return false;
     }
     
-    // Store payload in pool buffer: [LENGTH][SOURCE][PAYLOAD_DATA...]
-    // Note: SOURCE will be filled in by Core 0
-    buffer[0] = static_cast<uint8_t>(payload.size());
-    buffer[1] = 0;  // Source ID placeholder
-    memcpy(&buffer[2], payload.data(), payload.size());
-    
     // Try to push to FIFO (non-blocking)
     uint32_t word0, word1;
-    pack_fifo_message(word0, word1, handle, static_cast<uint8_t>(payload.size()));
+    pack_fifo_message(word0, word1, handle, length);
     
     if (multicore_fifo_wready()) {
         // FIFO has space - push both words
@@ -118,21 +99,13 @@ bool send_from_core1(std::span<const uint8_t> payload) {
         g_core1_sent++;
         return true;
     } else {
-        // FIFO full - release handle and drop
-        messages::g_message_pool.release(handle);
+        // FIFO full - caller must release handle
         g_core1_fifo_drops++;
         return false;
     }
 }
 
-bool send_from_core1(std::string_view message) {
-    return send_from_core1(std::span<const uint8_t>{
-        reinterpret_cast<const uint8_t*>(message.data()),
-        message.size()
-    });
-}
-
-void process_core1_messages() {
+void process_fifo_messages() {
     if (!g_is_initialized) {
         return;
     }
@@ -164,24 +137,18 @@ void process_core1_messages() {
             continue;
         }
         
-        // Get buffer and queue for transmission
-        uint8_t* buffer = messages::g_message_pool.get_ptr<uint8_t>(handle);
-        if (buffer) {
-            // Buffer format: [LENGTH][SOURCE][PAYLOAD...]
-            // Create span of the payload portion
-            std::span<const uint8_t> payload(&buffer[2], length);
-            
-            // Queue for transmission on Core 0
-            if (ftl::send_msg(payload)) {
-                g_core0_received++;
-            } else {
-                // Failed to queue - release handle
-                printf("Multicore: Failed to queue message from Core 1\n");
-                messages::g_message_pool.release(handle);
-            }
+        // *** THE STREAMLINED PATH ***
+        // Instead of calling ftl::send_msg and re-serializing,
+        // we directly enqueue the handle that Core 1 already
+        // prepared for us. This eliminates the circular dependency
+        // and the redundant memcpy.
+        if (internal_tx::enqueue_message_on_core0(handle)) {
+            g_core0_received++;
         } else {
-            // Invalid buffer - release handle
+            // TX queue is full - release handle and count as drop
             messages::g_message_pool.release(handle);
+            g_core0_tx_queue_drops++;
+            printf("Multicore: Core 0 TX queue full, dropping message\n");
         }
     }
 }
@@ -190,7 +157,8 @@ Statistics get_statistics() {
     return Statistics{
         g_core1_sent,
         g_core1_fifo_drops,
-        g_core0_received
+        g_core0_received,
+        g_core0_tx_queue_drops
     };
 }
 
@@ -198,5 +166,6 @@ bool is_core1_ready() {
     return multicore_fifo_wready();
 }
 
-} // namespace multicore
+} // namespace internal_multicore
+} // namespace uart
 } // namespace ftl

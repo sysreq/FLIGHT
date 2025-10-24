@@ -1,4 +1,4 @@
-#include "transport/uart/dma_control.h"
+#include "internal/uart_dma.h"
 
 #include "pico/printf.h"
 #include "hardware/uart.h"

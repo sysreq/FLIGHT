@@ -1,6 +1,6 @@
-#include "transport/uart/uart_rx.h"
+#include "internal/uart_rx.h"
+#include "internal/uart_dma.h"
 #include "core/ftl_api.h"
-#include "transport/uart/dma_control.h"
 #include "util/allocator.h"
 #include "util/cqueue.h"
 #include "util/misc.h"
@@ -14,7 +14,8 @@ namespace messages {
     extern MessagePoolType g_message_pool;
 }
 
-namespace rx {
+namespace uart {
+namespace internal_rx {
 
 namespace {
 
@@ -285,4 +286,6 @@ uint32_t get_queue_count() {
     return g_handle_queue.count();
 }
 
-}} // namespace ftl::rx
+} // namespace internal_rx
+} // namespace uart
+} // namespace ftl

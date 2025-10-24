@@ -1,10 +1,10 @@
-#include "transport/uart/uart_tx.h"
-#include "transport/uart/dma_control.h"
-#include "transport/uart/multicore_tx.h"
+#include "internal/uart_tx.h"
+#include "internal/uart_dma.h"
 #include "core/ftl_api.h"
 #include "util/allocator.h"
 #include "util/cqueue.h"
 #include "util/misc.h"
+#include "pico/stdlib.h"
 #include <cstring>
 
 namespace ftl {
@@ -12,7 +12,8 @@ namespace messages {
     extern MessagePoolType g_message_pool;
 }
 
-namespace tx {
+namespace uart {
+namespace internal_tx {
 
 namespace {
 
@@ -24,7 +25,6 @@ PoolHandle g_current_tx_handle = MessagePoolType::INVALID;
 
 // Device source ID
 uint8_t g_source_id = 0;
-uint8_t g_init_core = 0;
 
 // Statistics
 uint32_t g_total_queued = 0;
@@ -66,8 +66,8 @@ bool build_frame(PoolHandle handle, uint8_t* frame_buffer, size_t& frame_size) {
     // Length
     frame_buffer[idx++] = payload_length;
     
-    // Source ID
-    frame_buffer[idx++] = g_source_id;
+    // Source ID (use the one from the handle, which was set during acquire)
+    frame_buffer[idx++] = payload_ptr[1];
     
     // Payload (skip the LENGTH and SOURCE bytes from pool buffer)
     memcpy(&frame_buffer[idx], &payload_ptr[2], payload_length);
@@ -98,37 +98,39 @@ void initialize(uint8_t source_id) {
     g_total_sent = 0;
     g_queue_full_drops = 0;
     g_peak_queue_depth = 0;
-    g_init_core = get_core_num();
-
-    ftl::multicore::initialize();
 }
 
-bool send_message(ftl_internal::DmaController& dma_controller, std::span<const uint8_t> payload) {
+PoolHandle acquire_and_fill_message(std::span<const uint8_t> payload) {
     if (payload.empty() || payload.size() > ftl_config::MAX_PAYLOAD_SIZE) {
-        return false;
+        return MessagePoolType::INVALID;
     }
 
-    if(get_core_num() != g_init_core) {
-        return ftl::multicore::send_from_core1(payload);
-    }
-
+    // Acquire handle from pool
     PoolHandle handle = messages::g_message_pool.acquire();
     if (handle == MessagePoolType::INVALID) {
-        return false;
+        return MessagePoolType::INVALID;
     }
     
     // Get buffer pointer
     uint8_t* buffer = messages::g_message_pool.get_ptr<uint8_t>(handle);
     if (!buffer) {
         messages::g_message_pool.release(handle);
-        return false;
+        return MessagePoolType::INVALID;
     }
     
     // Store payload in pool buffer: [LENGTH][SOURCE][PAYLOAD_DATA...]
     buffer[0] = static_cast<uint8_t>(payload.size());
-    buffer[1] = g_source_id;
+    buffer[1] = g_source_id;  // Fill in source ID
     memcpy(&buffer[2], payload.data(), payload.size());
     
+    return handle;
+}
+
+bool enqueue_message_on_core0(PoolHandle handle) {
+    if (handle == MessagePoolType::INVALID) {
+        return false;
+    }
+
     // Try to enqueue
     if (!g_tx_queue.enqueue(handle)) {
         // Queue full - release handle and increment drop counter
@@ -147,16 +149,8 @@ bool send_message(ftl_internal::DmaController& dma_controller, std::span<const u
     return true;
 }
 
-bool send_message(ftl_internal::DmaController& dma_controller, std::string_view message) {
-    return send_message(dma_controller, std::span<const uint8_t>{
-        reinterpret_cast<const uint8_t*>(message.data()), 
-        message.size()
-    });
-}
-
 void process_tx_queue(ftl_internal::DmaController& dma_controller) {
-    ftl::multicore::process_core1_messages();
-
+    // Check if current transmission is complete
     if (g_current_tx_handle != MessagePoolType::INVALID) {
         if (!dma_controller.is_write_busy()) {
             // Transmission complete - release handle
@@ -226,5 +220,6 @@ uint32_t get_queue_count() {
     return g_tx_queue.count();
 }
 
-} // namespace tx
+} // namespace internal_tx
+} // namespace uart
 } // namespace ftl

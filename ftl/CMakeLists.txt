@@ -66,19 +66,42 @@ add_custom_target(ftl_generate_messages
 )
 
 # ==============================================================================
-# FTL Library Target
+# FTL UART Transport Target
+# ==============================================================================
+
+add_library(ftl_uart STATIC
+    transport/uart/uart.cpp
+    transport/uart/uart_dma.cpp
+    transport/uart/uart_rx.cpp
+    transport/uart/uart_tx.cpp
+    transport/uart/uart_multicore.cpp
+)
+
+target_include_directories(ftl_uart PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/transport/
+)
+
+# Link Pico SDK libraries needed for UART transport
+target_link_libraries(ftl_uart PUBLIC
+    pico_stdlib
+    pico_multicore
+    pico_unique_id
+    hardware_uart
+    hardware_dma
+    hardware_gpio
+)
+
+# Require C++23
+target_compile_features(ftl_uart PUBLIC cxx_std_23)
+
+# ==============================================================================
+# FTL Core Library Target
 # ==============================================================================
 
 add_library(ftl STATIC
     # Core API
     core/ftl_api.cpp
-
-
-    # Transport layer
-    transport/uart/dma_control.cpp
-    transport/uart/uart_rx.cpp
-    transport/uart/uart_tx.cpp
-    transport/uart/multicore_tx.cpp
 
     # Generated code
     ${FTL_MESSAGES_CPP}
@@ -90,18 +113,16 @@ add_dependencies(ftl ftl_generate_messages)
 target_include_directories(ftl PUBLIC
     # FTL directory itself (for internal includes)
     ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/
 
     # Generated headers
     ${FTL_GENERATED_DIR}
 )
 
-# Link Pico SDK libraries
+# Link transport layers and SDK utilities
 target_link_libraries(ftl PUBLIC
-    pico_stdlib
-    hardware_uart
-    hardware_dma
-    hardware_gpio
-    pico_unique_id
+    ftl_uart              # UART transport layer
+    pico_unique_id        # For device identification
 )
 
 # Require C++23
@@ -115,3 +136,4 @@ message(STATUS "FTL Library Configuration:")
 message(STATUS "  Message Schema: ${FTL_MESSAGES_YAML}")
 message(STATUS "  Generated Output: ${FTL_GENERATED_DIR}")
 message(STATUS "  C++ Standard: C++23")
+message(STATUS "  Transport Layers: UART")
