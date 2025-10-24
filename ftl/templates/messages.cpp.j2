@@ -1,0 +1,175 @@
+#include "messages.h"
+
+/**
+ * @file messages.cpp
+ * @brief Implementation of message helper functions
+ *
+ * Auto-generated from messages.yaml - Do not edit manually!
+ */
+
+namespace ftl {
+namespace messages {
+
+// =============================================================================
+// Helper Function Implementations
+// =============================================================================
+
+const char* message_type_name(MessageType type) {
+    switch (type) {
+{% for msg in messages %}
+    case MessageType::{{ msg.name }}: return "{{ msg.name }}";
+{% endfor %}
+    case MessageType::INVALID: return "INVALID";
+    default: return "UNKNOWN";
+    }
+}
+
+const char* error_name(MessageError error) {
+    switch (error) {
+    case MessageError::INVALID_HANDLE: return "INVALID_HANDLE";
+    case MessageError::WRONG_MESSAGE_TYPE: return "WRONG_MESSAGE_TYPE";
+    case MessageError::BUFFER_TOO_SMALL: return "BUFFER_TOO_SMALL";
+    case MessageError::INVALID_STRING_LENGTH: return "INVALID_STRING_LENGTH";
+    case MessageError::INVALID_ARRAY_SIZE: return "INVALID_ARRAY_SIZE";
+    case MessageError::PARSE_ERROR: return "PARSE_ERROR";
+    default: return "UNKNOWN_ERROR";
+    }
+}
+
+// Global message pool accessor
+// This must be defined in your main application or ftl core implementation
+ftl::MessagePoolType& get_message_pool() {
+    extern ftl::MessagePoolType g_message_pool;
+    return g_message_pool;
+}
+
+// =============================================================================
+// Default Print Handlers
+// =============================================================================
+
+{% for msg in messages %}
+void default_{{ msg.name }}_handler(const {{ msg.name }}_View& msg) {
+    printf("{{ msg.name }}: ");
+{% for field in msg.fields %}
+{% if field.is_string %}
+    printf("{{ field.name }}='%.*s'", 
+           static_cast<int>(msg.{{ field.name }}().size()), 
+           msg.{{ field.name }}().data());
+{% elif field.is_array %}
+    {
+        auto arr = msg.{{ field.name }}();
+        printf("{{ field.name }}=[");
+        for (size_t i = 0; i < arr.size(); ++i) {
+{% if field.element_type == 'float' or field.element_type == 'double' %}
+            printf("%.2f", arr[i]);
+{% elif field.element_type == 'bool' %}
+            printf("%s", arr[i] ? "true" : "false");
+{% elif field.element_type in ['uint8_t', 'uint16_t', 'uint32_t'] %}
+            printf("%u", arr[i]);
+{% elif field.element_type in ['int8_t', 'int16_t', 'int32_t'] %}
+            printf("%d", arr[i]);
+{% elif field.element_type == 'uint64_t' %}
+            printf("%llu", arr[i]);
+{% elif field.element_type == 'int64_t' %}
+            printf("%lld", arr[i]);
+{% else %}
+            printf("?");
+{% endif %}
+            if (i < arr.size() - 1) printf(", ");
+        }
+        printf("]");
+    }
+{% elif field.type == 'float' or field.type == 'double' %}
+    printf("{{ field.name }}=%.2f", msg.{{ field.name }}());
+{% elif field.type == 'bool' %}
+    printf("{{ field.name }}=%s", msg.{{ field.name }}() ? "true" : "false");
+{% elif field.type in ['uint8_t', 'uint16_t', 'uint32_t'] %}
+    printf("{{ field.name }}=%u", msg.{{ field.name }}());
+{% elif field.type in ['int8_t', 'int16_t', 'int32_t'] %}
+    printf("{{ field.name }}=%d", msg.{{ field.name }}());
+{% elif field.type == 'uint64_t' %}
+    printf("{{ field.name }}=%llu", msg.{{ field.name }}());
+{% elif field.type == 'int64_t' %}
+    printf("{{ field.name }}=%lld", msg.{{ field.name }}());
+{% else %}
+    printf("{{ field.name }}=?");
+{% endif %}
+{% if not loop.last %}
+    printf(", ");
+{% endif %}
+{% endfor %}
+    printf("\n");
+}
+
+{% endfor %}
+
+// =============================================================================
+// Dispatcher Implementation
+// =============================================================================
+
+Dispatcher::Dispatcher() {
+    // Initialize all handlers with defaults
+{% for msg in messages %}
+    {{ msg.name | lower }}_handler_ = default_{{ msg.name }}_handler;
+{% endfor %}
+}
+
+void Dispatcher::dispatch(ftl::MessageHandle& handle) {
+    // Check message validity
+    const uint8_t* data = handle.data();
+    if (!data || handle.length() < 1) {
+        printf("Invalid message: empty payload\n");
+        return;
+    }
+    
+    // Extract message type
+    MessageType type = static_cast<MessageType>(data[0]);
+    
+    // Dispatch to appropriate handler
+    switch (type) {
+{% for msg in messages %}
+    case MessageType::{{ msg.name }}: {
+        auto result = parse_{{ msg.name }}(handle);
+        if (result) {
+            if ({{ msg.name | lower }}_handler_) {
+                {{ msg.name | lower }}_handler_(*result);
+            }
+        } else {
+{% if use_expected %}
+            printf("Failed to parse {{ msg.name }}: %s\n", error_name(result.error()));
+{% else %}
+            printf("Failed to parse {{ msg.name }}\n");
+{% endif %}
+        }
+        break;
+    }
+{% endfor %}
+    
+    default:
+        printf("Unknown message type: %u\n", static_cast<uint8_t>(type));
+        break;
+    }
+}
+
+// =============================================================================
+// Dispatcher send() Implementations
+// =============================================================================
+
+{% for msg in messages %}
+bool Dispatcher::send_{{ msg.name | lower }}({% for field in msg.fields %}{{ field.builder_param_type }} {{ field.name }}{{ ", " if not loop.last }}{% endfor %}) {
+    auto msg = {{ msg.name }}::Builder()
+{% for field in msg.fields %}
+        .{{ field.name }}({{ field.name }})
+{% endfor %}
+        .build();
+    
+    if (msg.is_valid()) {
+        return ftl::send_msg(msg.span());
+    }
+    return false;
+}
+
+{% endfor %}
+
+} // namespace messages
+} // namespace ftl

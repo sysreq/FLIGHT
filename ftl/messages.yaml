@@ -1,0 +1,32 @@
+# messages.yaml
+# Message definitions for UART protocol
+# Strings are automatically length-prefixed (uint8_t length + data)
+
+messages:
+  - name: MSG_REMOTE_LOG
+    fields:
+      - { type: "uint32_t", name: "timestamp" }
+      - { type: "string", name: "remote_printf" }
+
+  # System state update
+  - name: MSG_SYSTEM_STATE
+    fields:
+      - { type: "uint8_t", name: "state_id" }
+      - { type: "bool", name: "is_active" }
+      - { type: "uint32_t", name: "uptime_ms" }
+
+  # Sensor telemetry
+  - name: MSG_SENSOR_HX711
+    fields:
+      - { type: "uint32_t", name: "timestamp" }
+      - { type: "uint32_t[10]", name: "samples" }
+
+  # Sensor telemetry
+  - name: MSG_SENSOR_ADS1115
+    fields:
+      - { type: "uint32_t", name: "timestamp" }
+      - { type: "float", name: "raw_1" }
+      - { type: "float", name: "raw_2" }
+      - { type: "float", name: "raw_3" }
+      - { type: "float", name: "raw_4" }
+      - { type: "float", name: "raw_5" }
