@@ -91,12 +91,7 @@ void process_fifo_messages() {
     
     while (multicore_fifo_rvalid()) {
         uint32_t word = multicore_fifo_pop_blocking();
-        
-        if (!multicore_fifo_rvalid()) {
-            printf("Multicore FIFO: Incomplete message (missing word 1)\n");
-            break;
-        }
-                
+                       
         uint8_t handle;
         if (!unpack_fifo_message(word, handle)) {
             printf("Multicore FIFO: Invalid magic (0x%08X)\n", word);
