@@ -1,56 +1,18 @@
 #pragma once
-
-/**
- * @file uart.h
- * @brief Unified UART Transport Layer API
- * 
- * This is the ONLY header other subsystems need to include for UART transport.
- * It provides a clean, core-safe interface that encapsulates all internal
- * complexity including DMA, RX state machine, TX queue, and multicore FIFO.
- * 
- * Architecture:
- * - Core 0: Initializes, polls, and handles all UART/DMA operations
- * - Core 1: Can send messages which are automatically routed through FIFO
- * - Internal modules handle framing, CRC, queuing, and synchronization
- * 
- * Usage:
- * ```cpp
- * // On Core 0 initialization:
- * ftl::uart::initialize(uart0, MY_DEVICE_ID);
- * 
- * // In Core 0 main loop:
- * ftl::uart::poll();
- * 
- * // From either core:
- * ftl::uart::send_message(payload);  // Automatically routed
- * 
- * // From Core 0 to receive:
- * if (ftl::uart::has_message()) {
- *     auto msg = ftl::uart::get_message();
- *     // Process message...
- * }
- * ```
- */
-
 #include "ftl.settings"
 #include <cstdint>
 #include <span>
 #include <string_view>
 
-// Forward declare hardware types
 struct uart_inst;
 typedef struct uart_inst uart_inst_t;
 
 namespace ftl {
 
-// Forward declare MessageHandle from public API
 class MessageHandle;
 
 namespace uart {
 
-/**
- * @brief TX statistics
- */
 struct TxStatistics {
     uint32_t total_messages_queued;
     uint32_t total_messages_sent;
@@ -59,9 +21,6 @@ struct TxStatistics {
     uint32_t peak_queue_depth;
 };
 
-/**
- * @brief RX statistics
- */
 struct RxStatistics {
     uint32_t total_bytes_received;
     uint32_t total_messages_received;
@@ -69,9 +28,6 @@ struct RxStatistics {
     uint32_t framing_errors;
 };
 
-/**
- * @brief Multicore statistics
- */
 struct MulticoreStatistics {
     uint32_t core1_messages_sent;      // Messages sent from Core 1
     uint32_t core1_fifo_full_drops;    // Drops due to FIFO full
@@ -149,43 +105,10 @@ bool has_message();
  */
 MessageHandle get_message();
 
-/**
- * @brief Check if the Core 0 TX queue is ready
- * 
- * Useful for flow control from Core 0.
- * 
- * @return true if the TX queue has space
- */
 bool is_tx_ready();
-
-/**
- * @brief Check if the Core 1 FIFO is ready
- * 
- * Useful for flow control from Core 1.
- * 
- * @return true if the inter-core FIFO has space
- */
 bool is_core1_tx_ready();
-
-/**
- * @brief Get TX statistics
- * 
- * @return TX statistics structure
- */
 TxStatistics get_tx_statistics();
-
-/**
- * @brief Get RX statistics
- * 
- * @return RX statistics structure
- */
 RxStatistics get_rx_statistics();
-
-/**
- * @brief Get multicore statistics
- * 
- * @return Multicore statistics structure
- */
 MulticoreStatistics get_multicore_statistics();
 
 } // namespace uart

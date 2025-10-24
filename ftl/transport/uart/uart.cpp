@@ -15,10 +15,8 @@ namespace messages {
 
 namespace uart {
 namespace {
-    // The UART module owns the DmaController
     ftl_internal::DmaController g_dma_controller;
     
-    // Store initialization state
     uint8_t g_source_id = 0;
     uint8_t g_init_core = 0;
     bool g_is_initialized = false;
@@ -35,10 +33,8 @@ void initialize(uart_inst_t* uart_inst, uint8_t source_id) {
     g_source_id = source_id;
     g_init_core = get_core_num();
     
-    // Initialize DMA controller
     g_dma_controller.init(uart_inst);
     
-    // Initialize internal subsystems
     internal_rx::initialize();
     internal_tx::initialize(source_id);
     internal_multicore::initialize();
@@ -77,8 +73,6 @@ bool send_message(std::span<const uint8_t> payload) {
         return false;
     }
 
-    // Step 1: Acquire a message pool handle and copy payload
-    // This is common to both cores
     PoolHandle handle = internal_tx::acquire_and_fill_message(payload);
     if (handle == MessagePoolType::INVALID) {
         return false; // Pool empty
@@ -94,7 +88,6 @@ bool send_message(std::span<const uint8_t> payload) {
         bool success = internal_multicore::send_from_core1(handle, 
                                                            static_cast<uint8_t>(payload.size()));
         if (!success) {
-            // FIFO was full - release the handle since we couldn't send it
             ftl::messages::g_message_pool.release(handle);
         }
         return success;
