@@ -17,8 +17,11 @@ This is a Raspberry Pi Pico 2 W (RP2350) embedded firmware project called "Forwa
 # Initial CMake configuration (from project root)
 cmake -B build
 
-# Build the project
+# Build the project (production firmware)
 cmake --build build
+
+# Build MOCK_MODULE for testing FTL without hardware
+cmake --build build --target MOCK_MODULE
 
 # Clean build
 cmake --build build --target clean
@@ -34,6 +37,7 @@ cmake --build build --target ftl_generate_messages
 - `FORWARD_MODULE.uf2` - Main firmware file for flashing
 - `FORWARD_MODULE.elf` - ELF binary
 - `FORWARD_MODULE.map` - Linker memory map
+- `MOCK_MODULE` - Single-core test executable for FTL integration testing
 
 **Flashing**: Copy the `.uf2` file to the Pico 2 when in BOOTSEL mode.
 
@@ -52,6 +56,22 @@ Both cores inherit from `SystemCore<Derived, MaxTasks>`, a CRTP-based template t
 - Global shutdown coordination through atomic flag `app::SystemCore::Global::system_active_`
 
 **Entry point**: `main.cpp` initializes Core 0, launches Core 1 via `multicore_launch_core1()`, then both enter their respective loops.
+
+### Inter-Core Communication
+
+**Hardware FIFO for Message Passing**:
+Core 1 cannot directly access UART/DMA resources (owned by Core 0). Instead, it uses the RP2350's hardware FIFO:
+
+- **Core 1**: Calls `ftl::multicore::send_from_core1(payload)` - non-blocking, ultra-low latency
+- **Core 0**: Processes queued messages via `ftl::multicore::process_core1_messages()` during `ftl::poll()`
+- **Implementation**: `ftl/transport/uart/multicore_tx.h/cpp`
+- **Benefits**: Single-cycle hardware access, no locks needed, Core 1 never blocks on UART
+
+**Global State Synchronization**:
+- `SystemState::globals_[]` provides atomic shared variables (defined in `app/SystemState.h`)
+- Enum `GLOBAL_VAR` includes: `ACTIVE`, `HX711_POLLING`
+- Example: `SystemCore::Global::system_active_` triggers graceful shutdown across both cores
+- Pattern: `SystemState::globals_[GLOBAL_VAR::ACTIVE].store(value)`
 
 ### FTL Message Library (`ftl/`)
 
@@ -102,11 +122,20 @@ dispatcher.send<ftl::messages::MSG_HEARTBEAT>(counter, status, "Device");
 - `ftl/transport/uart/uart_rx.cpp` - Receive with frame detection and CRC validation
 - `ftl/transport/uart/uart_tx.cpp` - Transmit with framing
 
+**Message Pool & Reference Counting**:
+- `ftl/util/allocator.h` - Fixed message pool: 32 messages × 256 bytes = 8 KB
+- Atomic reference counting with state machine: `STATE_FREE` → `STATE_ALLOCATING` → active ref count
+- Max 8 simultaneous references per message with overflow protection
+- Zero-copy access via RAII-style `MsgHandle<>` wrapper
+- Messages automatically return to pool when handle destroyed
+
 **Utilities**:
-- `ftl/util/allocator.h` - Fixed-size message pool with reference counting
-- `ftl/util/cqueue.h` - Circular queue for received messages
-- `ftl/util/crc16.h` - CRC16 calculation
-- `ftl/util/device_id.h` - Unique device ID from Pico flash
+- `ftl/util/cqueue.h` - Lock-free circular queue; capacity must be power-of-2
+- `ftl/util/misc.h` - Consolidates CRC16 and Device ID functionality:
+  - `crc16::calculate()`, `crc16::verify()` - CRC16-CCITT (polynomial 0x1021)
+  - `device_id::get_device_id()` - 8-bit unique ID from Pico flash
+  - `device_id::get_device_id_32()` - 32-bit variant
+  - `device_id::is_device(target_id)` - Device identification
 
 ### Device Drivers (`devices/`)
 
@@ -116,6 +145,12 @@ Standalone sensor driver library built as `StandaloneDevices`:
 - **ADS1115** (`ads1115_s.cpp/h`): 16-bit I2C ADC with polling mode and callback support
 
 Both drivers follow a pattern: `init()`, `update()/start_polling()`, and provide data through getters or callbacks.
+
+**Device Utilities** (`devices/misc/utility.h`):
+- Retry mechanisms: `retry_with_error_limit()`, `retry_with_timeout()`
+- Byte manipulation: `combine_bytes()`, `split_bytes()`
+- Math helpers: `clamp()`, `lerp()`
+- Device logging: `log_device(device_name, format, ...)`
 
 ### Application Layer (`app/`)
 
@@ -166,9 +201,35 @@ ForwardModule/
 ### Working with Dual Cores
 
 - Core 0 and Core 1 run independently after launch
-- Use FTL messages or shared memory (with proper synchronization) for inter-core communication
+- **Inter-core messaging**: Core 1 uses `ftl::multicore::send_from_core1()` to queue messages
+- **Shared state**: Use `SystemState::globals_[]` atomic variables for coordination
 - Call `SystemCore::shutdown()` to signal both cores to exit gracefully
 - Core 1 automatically exits when `system_active_` becomes false
+
+### Testing with MOCK_MODULE
+
+Build standalone test executable: `cmake --build build --target MOCK_MODULE`
+
+- Single-core variant for testing FTL messaging without hardware dependencies
+- Compiled with `-DMOCK_MODULE` flag, disables multicore code paths
+- Runs message dispatcher loop for integration testing
+- Conditional compilation in `main.cpp` (lines 6-12, 62-100)
+
+## Hardware Configuration
+
+**Pin Assignments**:
+- **UART0**: GP0 (TX), GP1 (RX) @ 230400 baud (configured in `ftl/config.settings`)
+- **HX711**: GPIO-based software bit-banging (pins configured in device initialization)
+- **ADS1115**: I2C interface (pins configurable in device init)
+- **Board**: Raspberry Pi Pico 2 W (RP2350 with WiFi hardware)
+
+## Debugging
+
+**VS Code Configuration**:
+- Debug configs in `.vscode/launch.json` support Cortex-Debug with OpenOCD
+- Two configurations: built-in OpenOCD or external OpenOCD server
+- SVD file enables hardware register inspection during debugging
+- Uses CMake Tools + Ninja for builds
 
 ## Important Notes
 
@@ -179,6 +240,7 @@ ForwardModule/
 - **C++ Standard**: Requires C++23 for FTL library (uses modern features like `std::span`, concepts)
 - **Task scheduling**: Use `add_task()` in Core controllers for periodic operations instead of manual timing
 - **Shutdown sequence**: `main.cpp` resets USB and enters bootloader mode after clean shutdown
+- **Code generation**: Message classes auto-generated from `messages.yaml` via Jinja2 templates; creates type-safe `View` classes for zero-copy payload access
 
 ## Git Branch Strategy
 
