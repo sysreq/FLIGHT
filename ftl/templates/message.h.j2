@@ -58,11 +58,27 @@ public:
 {% for prev_field in msg.fields[:loop.index0] %}
 {% if prev_field.is_string %}
         detail::read_string(data_, offset, length_);  // Skip previous string
+{% elif prev_field.is_array %}
+        offset += {{ prev_field.size_expr }};  // Skip array
 {% else %}
         offset += {{ prev_field.size_expr }};
 {% endif %}
 {% endfor %}
         return detail::read_string(data_, offset, length_);
+    }
+{% elif field.is_array %}
+    {{ field.cpp_type }} {{ field.name }}() const {
+        size_t offset = 1;  // Skip message type byte
+{% for prev_field in msg.fields[:loop.index0] %}
+{% if prev_field.is_string %}
+        detail::read_string(data_, offset, length_);  // Skip previous string
+{% elif prev_field.is_array %}
+        offset += {{ prev_field.size_expr }};  // Skip array
+{% else %}
+        offset += {{ prev_field.size_expr }};
+{% endif %}
+{% endfor %}
+        return detail::read_array<{{ field.element_type }}, {{ field.array_size }}>(data_, offset, length_);
     }
 {% else %}
     {{ field.cpp_type }} {{ field.name }}() const {
@@ -70,6 +86,8 @@ public:
 {% for prev_field in msg.fields[:loop.index0] %}
 {% if prev_field.is_string %}
         detail::read_string(data_, offset, length_);  // Skip previous string
+{% elif prev_field.is_array %}
+        offset += {{ prev_field.size_expr }};  // Skip array
 {% else %}
         offset += {{ prev_field.size_expr }};
 {% endif %}
@@ -148,6 +166,21 @@ public:
             }
         }
         return *this;
+    }
+{% elif field.is_array %}
+    // Accept std::span<const {{ field.element_type }}>
+    {{ msg.name }}_Builder& {{ field.name }}({{ field.builder_param_type }} values) {
+        if (valid_ && data_) {
+            if (!detail::write_array<{{ field.element_type }}, {{ field.array_size }}>(data_, offset_, ftl_config::MAX_PAYLOAD_SIZE, values)) {
+                valid_ = false;
+            }
+        }
+        return *this;
+    }
+    
+    // Accept std::array<{{ field.element_type }}, {{ field.array_size }}>
+    {{ msg.name }}_Builder& {{ field.name }}(const std::array<{{ field.element_type }}, {{ field.array_size }}>& values) {
+        return {{ field.name }}(std::span<const {{ field.element_type }}>(values.data(), {{ field.array_size }}));
     }
 {% else %}
     {{ msg.name }}_Builder& {{ field.name }}({{ field.cpp_type }} value) {

@@ -51,8 +51,9 @@ constexpr size_t PROTOCOL_OVERHEAD = DELIMITER_SIZE * 2 + LENGTH_SIZE + SOURCE_I
 constexpr size_t MAX_PAYLOAD_SIZE = MAX_MESSAGE_SIZE - PROTOCOL_OVERHEAD;  // 248 bytes
 
 // Message pool configuration
-constexpr size_t MESSAGE_POOL_SIZE = 32;  // Number of messages in pool
+constexpr size_t MESSAGE_POOL_SIZE = 32;   // Number of messages in pool
 constexpr size_t MESSAGE_QUEUE_DEPTH = 16; // Receive queue depth
+constexpr size_t TX_QUEUE_DEPTH = 16;      // Transmit queue depth
 
 // =============================================================================
 // DMA Configuration

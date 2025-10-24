@@ -73,10 +73,12 @@ add_library(ftl STATIC
     # Core API
     core/ftl_api.cpp
 
+
     # Transport layer
     transport/uart/dma_control.cpp
     transport/uart/uart_rx.cpp
     transport/uart/uart_tx.cpp
+    transport/uart/multicore_tx.cpp
 
     # Generated code
     ${FTL_MESSAGES_CPP}

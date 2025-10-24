@@ -5,6 +5,8 @@
 #include <cstdint>
 #include <cstdio>
 #include <string_view>
+#include <span>
+#include <array>
 #include <functional>
 #include <expected>
 
@@ -41,6 +43,7 @@ enum class MessageError {
     WRONG_MESSAGE_TYPE,
     BUFFER_TOO_SMALL,
     INVALID_STRING_LENGTH,
+    INVALID_ARRAY_SIZE,
     PARSE_ERROR
 };
 
@@ -86,17 +89,52 @@ inline std::string_view read_string(const uint8_t* data, size_t& offset, size_t 
     return result;
 }
 
-// Write length-prefixed string
+// Write length-prefixed string (FIXED: corrected null terminator handling)
 inline bool write_string(uint8_t* data, size_t& offset, size_t max_len, std::string_view str) {
-    const size_t str_size = str.size() + 1; // include null terminator
-    if (str_size > 255) return false;
-    if (offset + 1 + str_size > max_len) return false;
+    if (str.size() > 255) return false;
+    if (offset + 1 + str.size() + 1 > max_len) return false;  // +1 for length, +1 for null
     
     data[offset++] = static_cast<uint8_t>(str.size());
-    std::memcpy(data + offset, str.data(), str_size);
-    offset += str_size;
-    data[offset - 1] = '\0'; // null terminator
+    std::memcpy(data + offset, str.data(), str.size());
+    offset += str.size();
+    data[offset++] = '\0';  // null terminator
     return true;
+}
+
+// Read fixed-size array as span (zero-copy view)
+template<typename T, size_t N>
+inline std::span<const T> read_array(const uint8_t* data, size_t& offset, size_t max_len) {
+    constexpr size_t array_bytes = sizeof(T) * N;
+    
+    if (offset + array_bytes > max_len) {
+        return {};  // Return empty span on error
+    }
+    
+    // Cast to properly aligned pointer and create span
+    const T* array_ptr = reinterpret_cast<const T*>(data + offset);
+    offset += array_bytes;
+    
+    return std::span<const T>(array_ptr, N);
+}
+
+// Write fixed-size array from span
+template<typename T, size_t N>
+inline bool write_array(uint8_t* data, size_t& offset, size_t max_len, std::span<const T> values) {
+    constexpr size_t array_bytes = sizeof(T) * N;
+    
+    // Validate size matches
+    if (values.size() != N) return false;
+    if (offset + array_bytes > max_len) return false;
+    
+    std::memcpy(data + offset, values.data(), array_bytes);
+    offset += array_bytes;
+    return true;
+}
+
+// Write fixed-size array from std::array
+template<typename T, size_t N>
+inline bool write_array(uint8_t* data, size_t& offset, size_t max_len, const std::array<T, N>& values) {
+    return write_array<T, N>(data, offset, max_len, std::span<const T>(values.data(), N));
 }
 
 } // namespace detail

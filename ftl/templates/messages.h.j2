@@ -48,6 +48,10 @@ namespace messages {
  *   // Send messages with type-safe interface
  *   dispatcher.send<MSG_LOG_STRING>("SYSTEM", "Hello World");
  *   dispatcher.send<MSG_SENSOR_DATA>(sensor_id, temp, pressure, humidity);
+ *   
+ *   // Send messages with arrays
+ *   std::array<float, 5> samples = {1.0f, 2.0f, 3.0f, 4.0f, 5.0f};
+ *   dispatcher.send<MSG_ARRAY_DATA>(timestamp, samples);
  */
 class Dispatcher {
 private:
@@ -88,6 +92,10 @@ public:
      * Example:
      *   dispatcher.send<MSG_LOG_STRING>("SYSTEM", "Hello");
      *   dispatcher.send<MSG_SENSOR_DATA>(1, 25.5f, 101.3f, 60.0f);
+     *   
+     *   // With arrays
+     *   std::array<float, 5> readings = {1.0f, 2.0f, 3.0f, 4.0f, 5.0f};
+     *   dispatcher.send<MSG_ARRAY_DATA>(timestamp, readings);
      * 
      * @tparam MsgType Message type class (e.g., MSG_LOG_STRING)
      * @param args Message field values in declaration order
@@ -109,7 +117,7 @@ public:
 private:
     // Internal send implementations (one per message type)
 {% for msg in messages %}
-    bool send_{{ msg.name | lower }}({% for field in msg.fields %}{{ field.cpp_type }} {{ field.name }}{{ ", " if not loop.last }}{% endfor %});
+    bool send_{{ msg.name | lower }}({% for field in msg.fields %}{{ field.builder_param_type }} {{ field.name }}{{ ", " if not loop.last }}{% endfor %});
 {% endfor %}
 };
 

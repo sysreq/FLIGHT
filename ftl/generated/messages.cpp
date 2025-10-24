@@ -31,6 +31,7 @@ const char* error_name(MessageError error) {
     case MessageError::WRONG_MESSAGE_TYPE: return "WRONG_MESSAGE_TYPE";
     case MessageError::BUFFER_TOO_SMALL: return "BUFFER_TOO_SMALL";
     case MessageError::INVALID_STRING_LENGTH: return "INVALID_STRING_LENGTH";
+    case MessageError::INVALID_ARRAY_SIZE: return "INVALID_ARRAY_SIZE";
     case MessageError::PARSE_ERROR: return "PARSE_ERROR";
     default: return "UNKNOWN_ERROR";
     }

@@ -3,15 +3,19 @@
 Message Code Generator for UART Protocol
 Generates C++ message types, views, and builders from YAML schema
 
-Now uses external Jinja2 templates and generates modular message headers.
+Now supports:
+- Primitive types (uint8_t, float, etc.)
+- String types (length-prefixed)
+- Array types (uint32_t[5], float[10], etc.)
 """
 
 import yaml
 import sys
+import re
 from pathlib import Path
 from jinja2 import Environment, FileSystemLoader
 from dataclasses import dataclass
-from typing import List
+from typing import List, Optional
 
 @dataclass
 class Field:
@@ -19,12 +23,59 @@ class Field:
     type: str
     name: str
     is_string: bool = False
+    is_array: bool = False
+    array_size: int = 0
+    element_type: str = ""
+    
+    @classmethod
+    def from_yaml(cls, field_def: dict) -> 'Field':
+        """Parse field from YAML definition"""
+        type_str = field_def['type']
+        name = field_def['name']
+        
+        # Check for string type
+        if type_str == 'string':
+            return cls(
+                type=type_str,
+                name=name,
+                is_string=True
+            )
+        
+        # Check for array type: "uint32_t[5]" or "float[10]"
+        array_match = re.match(r'(\w+)\[(\d+)\]', type_str)
+        if array_match:
+            element_type = array_match.group(1)
+            array_size = int(array_match.group(2))
+            return cls(
+                type=type_str,
+                name=name,
+                is_array=True,
+                array_size=array_size,
+                element_type=element_type
+            )
+        
+        # Regular primitive type
+        return cls(
+            type=type_str,
+            name=name
+        )
     
     @property
     def cpp_type(self) -> str:
         """Get C++ type for field"""
         if self.is_string:
             return "std::string_view"
+        elif self.is_array:
+            return f"std::span<const {self.element_type}>"
+        return self.type
+    
+    @property
+    def builder_param_type(self) -> str:
+        """Get C++ type for builder parameter"""
+        if self.is_string:
+            return "std::string_view"
+        elif self.is_array:
+            return f"std::span<const {self.element_type}>"
         return self.type
     
     @property
@@ -32,6 +83,16 @@ class Field:
         """Get size expression for serialization"""
         if self.is_string:
             return f"(1 + {self.name}.size())"  # length byte + data
+        
+        if self.is_array:
+            size_map = {
+                'uint8_t': '1', 'int8_t': '1', 'bool': '1',
+                'uint16_t': '2', 'int16_t': '2',
+                'uint32_t': '4', 'int32_t': '4', 'float': '4',
+                'uint64_t': '8', 'int64_t': '8', 'double': '8',
+            }
+            element_size = size_map.get(self.element_type, f"sizeof({self.element_type})")
+            return f"({element_size} * {self.array_size})"
         
         size_map = {
             'uint8_t': '1', 'int8_t': '1', 'bool': '1',
@@ -58,6 +119,15 @@ class Message:
             if field.is_string:
                 has_variable = True
                 fixed_size += 1  # just the length byte for sizing
+            elif field.is_array:
+                size_map = {
+                    'uint8_t': 1, 'int8_t': 1, 'bool': 1,
+                    'uint16_t': 2, 'int16_t': 2,
+                    'uint32_t': 4, 'int32_t': 4, 'float': 4,
+                    'uint64_t': 8, 'int64_t': 8, 'double': 8,
+                }
+                element_size = size_map.get(field.element_type, 4)
+                fixed_size += element_size * field.array_size
             else:
                 size_map = {
                     'uint8_t': 1, 'int8_t': 1, 'bool': 1,
@@ -79,14 +149,7 @@ def parse_yaml(yaml_path: Path) -> List[Message]:
     
     messages = []
     for idx, msg_def in enumerate(data['messages']):
-        fields = []
-        for field_def in msg_def['fields']:
-            is_string = field_def['type'] == 'string'
-            fields.append(Field(
-                type=field_def['type'],
-                name=field_def['name'],
-                is_string=is_string
-            ))
+        fields = [Field.from_yaml(field_def) for field_def in msg_def['fields']]
         
         messages.append(Message(
             name=msg_def['name'],
@@ -166,6 +229,11 @@ def main():
         print("  messages.yaml  - Input YAML file with message definitions")
         print("  output_dir     - Output directory (default: current directory)")
         print("  template_dir   - Template directory (default: ./templates)")
+        print("\nSupported field types:")
+        print("  - Primitives: uint8_t, int8_t, uint16_t, int16_t, uint32_t, int32_t")
+        print("                uint64_t, int64_t, float, double, bool")
+        print("  - Strings:    string (length-prefixed)")
+        print("  - Arrays:     <type>[<size>]  (e.g., float[5], uint32_t[10])")
         sys.exit(1)
     
     yaml_path = Path(sys.argv[1])
@@ -194,7 +262,7 @@ def main():
     print("\nNext steps:")
     print("1. Add messages.cpp to your build system")
     print("2. Include messages.h in your application code")
-    print("3. Ensure g_message_pool is defined in your uart_api.cpp")
+    print("3. Ensure g_message_pool is defined in your ftl_api.cpp")
 
 
 if __name__ == '__main__':

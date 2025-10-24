@@ -61,16 +61,17 @@ void initialize() {
 
     g_is_initialized = true;
     
-    printf("UART initialized with source ID: 0x%02X\n", source_id);
+    printf("FTL initialized with source ID: 0x%02X\n", source_id);
 }
 
 void poll() {
     if (!g_is_initialized) {
         return;
     }
-    
     g_dma_controller.process_rx_dma();
     rx::process(g_dma_controller);
+    
+    tx::process_tx_queue(g_dma_controller);
 }
 
 bool has_msg() {
@@ -105,7 +106,7 @@ bool is_tx_ready() {
     if (!g_is_initialized) {
         return true;
     }
-    return tx::is_ready(g_dma_controller);
+    return tx::is_ready();
 }
 
 uint8_t get_my_source_id() {
@@ -123,6 +124,26 @@ void get_stats(uint32_t& total_bytes_rx, uint32_t& total_messages_rx,
     pool_allocated = rx::get_pool_allocated_count();
     crc_errors = stats.crc_errors;
     framing_errors = stats.framing_errors;
+}
+
+void get_tx_stats(uint32_t& total_queued, uint32_t& total_sent,
+                  uint32_t& queue_full_drops, uint32_t& current_queue_depth,
+                  uint32_t& peak_queue_depth) {
+    tx::Statistics stats = tx::get_statistics();
+    
+    total_queued = stats.total_messages_queued;
+    total_sent = stats.total_messages_sent;
+    queue_full_drops = stats.queue_full_drops;
+    current_queue_depth = stats.current_queue_depth;
+    peak_queue_depth = stats.peak_queue_depth;
+}
+
+uint32_t get_tx_queue_count() {
+    return tx::get_queue_count();
+}
+
+bool is_tx_queue_empty() {
+    return tx::is_queue_empty();
 }
 
 } // namespace ftl

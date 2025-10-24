@@ -21,12 +21,13 @@
  * - Source ID tracking
  * - Zero-copy message access via reference-counted handles
  * - Fixed-size pool allocation (no heap fragmentation)
+ * - Non-blocking TX queue (messages queued and sent during poll())
  * 
  * Usage pattern:
  * 1. Call ftl::initialize() once at startup
- * 2. Call ftl::poll() regularly in main loop
+ * 2. Call ftl::poll() regularly in main loop (processes both RX and TX)
  * 3. Use ftl::has_msg() and ftl::get_msg() to retrieve messages
- * 4. Use ftl::send_msg() to transmit messages with your source ID
+ * 4. Use ftl::send_msg() to queue messages (returns immediately)
  */
 
 namespace ftl {
@@ -175,8 +176,6 @@ public:
 /**
  * @brief Initialize UART hardware and DMA subsystem
  * 
- * @param my_source_id Source ID for this device (0-255)
- * 
  * Configures UART peripheral, GPIO pins, DMA channels, and message pool.
  * Must be called once before any other API calls.
  */
@@ -190,6 +189,7 @@ void initialize();
  * - Assembling received bytes into complete messages
  * - Validating message format and CRC
  * - Managing message pool and queue
+ * - Processing TX queue and starting DMA transfers
  * 
  * Call this frequently (ideally every main loop iteration) for low latency.
  */
@@ -214,12 +214,13 @@ bool has_msg();
 MessageHandle get_msg();
 
 /**
- * @brief Send a message with automatic framing and CRC
+ * @brief Queue a message for transmission (non-blocking)
  * 
  * @param payload Payload data to transmit (max 248 bytes)
- * @return true if transmission started, false if busy or data too large
+ * @return true if queued successfully, false if queue full or data too large
  * 
- * Automatically adds:
+ * Message is queued and will be transmitted during the next poll() call.
+ * Returns immediately without waiting for DMA. Automatically adds:
  * - Start delimiter (0xAACC)
  * - Length byte
  * - Source ID (set during initialization)
@@ -229,17 +230,17 @@ MessageHandle get_msg();
 bool send_msg(std::span<const uint8_t> payload);
 
 /**
- * @brief Send a string message
+ * @brief Queue a string message for transmission (non-blocking)
  * 
  * @param message String message to transmit
- * @return true if transmission started, false if busy or data too large
+ * @return true if queued successfully, false if queue full or data too large
  */
 bool send_msg(std::string_view message);
 
 /**
- * @brief Check if transmitter is ready for new message
+ * @brief Check if transmitter is ready to accept more messages
  * 
- * @return true if TX is idle and ready for new data
+ * @return true if TX queue has space available
  */
 bool is_tx_ready();
 
@@ -251,11 +252,11 @@ bool is_tx_ready();
 uint8_t get_my_source_id();
 
 /**
- * @brief Get statistics about message processing
+ * @brief Get RX statistics about message processing
  * 
  * @param total_bytes_rx Total bytes received
  * @param total_messages_rx Total valid messages received
- * @param messages_queued Number of messages currently in queue
+ * @param messages_queued Number of messages currently in RX queue
  * @param pool_allocated Number of pool allocations currently in use
  * @param crc_errors Number of messages with CRC errors
  * @param framing_errors Number of framing errors detected
@@ -263,5 +264,32 @@ uint8_t get_my_source_id();
 void get_stats(uint32_t& total_bytes_rx, uint32_t& total_messages_rx, 
                uint32_t& messages_queued, uint32_t& pool_allocated,
                uint32_t& crc_errors, uint32_t& framing_errors);
+
+/**
+ * @brief Get TX statistics about message queuing and transmission
+ * 
+ * @param total_queued Total messages queued for transmission
+ * @param total_sent Total messages successfully transmitted
+ * @param queue_full_drops Number of messages dropped due to full queue
+ * @param current_queue_depth Current number of messages in TX queue
+ * @param peak_queue_depth Peak TX queue depth since initialization
+ */
+void get_tx_stats(uint32_t& total_queued, uint32_t& total_sent,
+                  uint32_t& queue_full_drops, uint32_t& current_queue_depth,
+                  uint32_t& peak_queue_depth);
+
+/**
+ * @brief Get current number of messages in TX queue
+ * 
+ * @return Number of messages waiting to be transmitted
+ */
+uint32_t get_tx_queue_count();
+
+/**
+ * @brief Check if TX queue is empty
+ * 
+ * @return true if no messages waiting to transmit
+ */
+bool is_tx_queue_empty();
 
 } // namespace ftl
