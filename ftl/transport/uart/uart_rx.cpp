@@ -3,7 +3,7 @@
 #include "transport/uart/dma_control.h"
 #include "util/allocator.h"
 #include "util/cqueue.h"
-#include "util/crc16.h"
+#include "util/misc.h"
 #include <cstring>
 #include <algorithm>
 

@@ -2,16 +2,11 @@
 
 #include <cstdint>
 #include <cstddef>
+#include <cstdio>
+#include <cstring>
 #include <span>
 
-/**
- * @file crc16.h
- * @brief CRC16-CCITT implementation for message validation
- * 
- * Uses polynomial 0x1021 (CRC-CCITT)
- * Initial value: 0xFFFF
- * No final XOR
- */
+#include "pico/unique_id.h"
 
 namespace crc16 {
 
@@ -51,13 +46,6 @@ constexpr uint16_t CRC16_TABLE[256] = {
     0x6E17, 0x7E36, 0x4E55, 0x5E74, 0x2E93, 0x3EB2, 0x0ED1, 0x1EF0
 };
 
-/**
- * @brief Calculate CRC16-CCITT for a data buffer
- * 
- * @param data Pointer to data buffer
- * @param length Length of data in bytes
- * @return uint16_t Calculated CRC16 value
- */
 inline uint16_t calculate(const uint8_t* data, size_t length) {
     uint16_t crc = 0xFFFF;  // Initial value
     
@@ -69,26 +57,91 @@ inline uint16_t calculate(const uint8_t* data, size_t length) {
     return crc;
 }
 
-/**
- * @brief Calculate CRC16-CCITT for a data span
- * 
- * @param data Span of data bytes
- * @return uint16_t Calculated CRC16 value
- */
 inline uint16_t calculate(std::span<const uint8_t> data) {
     return calculate(data.data(), data.size());
 }
 
-/**
- * @brief Verify CRC16 for a message
- * 
- * @param data Pointer to data buffer
- * @param length Length of data (without CRC bytes)
- * @param expected_crc Expected CRC16 value
- * @return true if CRC matches, false otherwise
- */
 inline bool verify(const uint8_t* data, size_t length, uint16_t expected_crc) {
     return calculate(data, length) == expected_crc;
 }
 
 } // namespace crc16
+
+namespace device_id {
+
+inline uint8_t get_device_id() {
+    pico_unique_board_id_t board_id;
+    pico_get_unique_board_id(&board_id);
+    
+    // XOR all 8 bytes together for better distribution
+    uint8_t id = 0;
+    for (int i = 0; i < PICO_UNIQUE_BOARD_ID_SIZE_BYTES; i++) {
+        id ^= board_id.id[i];
+    }
+    
+    // Ensure ID is never 0 (reserved for broadcast/invalid)
+    if (id == 0) {
+        id = 1;
+    }
+    
+    return id;
+}
+
+inline void get_board_id_string(char* buffer, size_t buffer_size) {
+    if (buffer_size < (PICO_UNIQUE_BOARD_ID_SIZE_BYTES * 2 + 1)) {
+        buffer[0] = '\0';
+        return;
+    }
+    
+    pico_unique_board_id_t board_id;
+    pico_get_unique_board_id(&board_id);
+    
+    for (int i = 0; i < PICO_UNIQUE_BOARD_ID_SIZE_BYTES; i++) {
+        snprintf(buffer + (i * 2), 3, "%02X", board_id.id[i]);
+    }
+}
+
+inline uint32_t get_device_id_32() {
+    pico_unique_board_id_t board_id;
+    pico_get_unique_board_id(&board_id);
+    
+    uint32_t id = 0;
+    id |= ((uint32_t)board_id.id[4] << 24);
+    id |= ((uint32_t)board_id.id[5] << 16);
+    id |= ((uint32_t)board_id.id[6] << 8);
+    id |= ((uint32_t)board_id.id[7]);
+    
+    return id;
+}
+
+inline void print_device_info() {
+    char board_id_str[PICO_UNIQUE_BOARD_ID_SIZE_BYTES * 2 + 1];
+    get_board_id_string(board_id_str, sizeof(board_id_str));
+    
+    uint8_t device_id_8 = get_device_id();
+    uint32_t device_id_32 = get_device_id_32();
+    
+    printf("Device Identification:\n");
+    printf("  Board ID (64-bit):  %s\n", board_id_str);
+    printf("  Device ID (8-bit):  %u (0x%02X)\n", device_id_8, device_id_8);
+    printf("  Device ID (32-bit): %u (0x%08X)\n", device_id_32, device_id_32);
+}
+
+inline bool is_device(const char* target_board_id) {
+    char my_board_id[PICO_UNIQUE_BOARD_ID_SIZE_BYTES * 2 + 1];
+    get_board_id_string(my_board_id, sizeof(my_board_id));
+    
+    for (size_t i = 0; i < strlen(target_board_id) && i < sizeof(my_board_id); i++) {
+        char c1 = my_board_id[i];
+        char c2 = target_board_id[i];
+        
+        if (c1 >= 'a' && c1 <= 'z') c1 -= 32;  // to uppercase
+        if (c2 >= 'a' && c2 <= 'z') c2 -= 32;
+        
+        if (c1 != c2) return false;
+    }
+    
+    return true;
+}
+
+} // namespace device_id

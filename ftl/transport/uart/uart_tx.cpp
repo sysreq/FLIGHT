@@ -1,6 +1,6 @@
 #include "transport/uart/uart_tx.h"
 #include "transport/uart/dma_control.h"
-#include "util/crc16.h"
+#include "util/misc.h"
 #include <cstring>
 
 namespace ftl {
