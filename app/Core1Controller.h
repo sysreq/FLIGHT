@@ -8,6 +8,8 @@
 #include "hx711_s.h"
 #include "ads1115_s.h"
 
+#include "CommandLine.h"
+
 class Core1Controller : public SystemCore<Core1Controller, 8> {
 private:
     friend class SystemCore<Core1Controller, 8>;
@@ -22,7 +24,9 @@ private:
 
         scale_.update();
         if (scale_.valid()) {
-            printf("Scale Data: %.2f [Raw: %d, Tared: %d]\n", scale_.weight(), scale_.raw(), scale_.tared());
+            if(SystemState::globals_[GLOBAL_VAR::HX711_DISABLE_PRINTING].load() == 0) {
+                printf("Scale Data: %.2f [Raw: %d, Tared: %d]\n", scale_.weight(), scale_.raw(), scale_.tared());
+            }
 
             hx711_readings[index] = static_cast<uint32_t>(scale_.raw());
             index = (index + 1) % hx711_readings.size();
@@ -52,14 +56,9 @@ private:
     bool init_impl() {
         printf("Core 1: Initializing...\n");
 
-        // Initialize multicore lockout victim
-        // This allows Core 0 to safely lock out Core 1 during flash operations
-        multicore_lockout_victim_init();
-        printf("Core 1: Multicore lockout victim initialized\n");
+        SystemState::globals_[GLOBAL_VAR::HX711_DISABLE_PRINTING] = 1;
 
         QUIT_ON_FAILURE(scale_.init(), "HX711");
-
-        // Load calibration settings from flash
         if (scale_.load_calibration_settings()) {
             printf("Core 1: HX711 calibration loaded successfully\n");
         } else {
@@ -79,6 +78,15 @@ private:
     #undef QUIT_ON_FAILURE
 
     void loop_impl() {
+        if(SystemState::globals_[GLOBAL_VAR::HX711_PRINT_CURRENT_WEIGHT].load()) {
+            SystemState::globals_[GLOBAL_VAR::HX711_PRINT_CURRENT_WEIGHT] = 0;
+            printf("Current Scale Weight: %.2f", scale_.weight());
+        }
+
+        if(SystemState::globals_[GLOBAL_VAR::HX711_PRINT_OFFSET_VALUES].load()) {
+            SystemState::globals_[GLOBAL_VAR::HX711_PRINT_OFFSET_VALUES] = 0;
+            printf("Offsets:\n\tScale: %.2f\n\tTare: %d", scale_.get_scale_factor(), scale_.get_tare_offset());
+        }
         __nop();
     }
 

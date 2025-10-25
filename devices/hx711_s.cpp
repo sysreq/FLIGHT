@@ -293,11 +293,9 @@ bool HX711Device::load_calibration_settings() {
     FlashStorage::CalibrationData flash_data;
 
     if (FlashStorage::read_calibration(flash_data)) {
-        // Valid calibration data found in flash
         saved_tare_offset_ = flash_data.tare_offset;
         saved_scale_factor_ = flash_data.scale_factor;
 
-        // Update runtime values to match saved values
         tare_offset_ = saved_tare_offset_;
         scale_factor_ = saved_scale_factor_;
 
@@ -305,7 +303,6 @@ bool HX711Device::load_calibration_settings() {
                    tare_offset_, scale_factor_);
         return true;
     } else {
-        // No valid calibration found, use compile-time defaults and save them
         log_device("HX711", "No valid calibration in flash, using defaults");
 
         saved_tare_offset_ = HX711::DEFAULT_TARE_OFFSET;
@@ -313,7 +310,6 @@ bool HX711Device::load_calibration_settings() {
         tare_offset_ = saved_tare_offset_;
         scale_factor_ = saved_scale_factor_;
 
-        // Save the defaults to flash for next time
         if (FlashStorage::write_calibration(saved_tare_offset_, saved_scale_factor_)) {
             log_device("HX711", "Saved default calibration to flash");
             return true;

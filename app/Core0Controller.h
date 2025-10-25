@@ -6,6 +6,8 @@
 #include "pico/printf.h"
 
 #include "ftl/ftl.h"
+#include "CommandLine.h"
+
 
 class Core0Controller : public SystemCore<Core0Controller, 8> {
 private:
@@ -25,8 +27,8 @@ private:
 
     void loop_impl() {
         ftl::poll();
-
-        // Periodically send heartbeat message
+        CommandLineInterface::process_cli_commands();
+        
         now = to_ms_since_boot(get_absolute_time());
         if (now - last_heartbeat >= 1000 && ftl::is_tx_ready()) {
             dispatcher.send<ftl::messages::MSG_REMOTE_LOG>(now, "Heartbeat from Core 0");

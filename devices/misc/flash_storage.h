@@ -124,14 +124,12 @@ bool write_calibration(int32_t tare_offset, float scale_factor) {
     memset(flash_buffer, 0xFF, FLASH_PAGE_SIZE);
     memcpy(flash_buffer, &data, sizeof(CalibrationData));
 
-    //multicore_lockout_start_blocking();
     uint32_t interrupts = save_and_disable_interrupts();
 
     flash_range_erase(CALIBRATION_FLASH_OFFSET, FLASH_SECTOR_SIZE);
     flash_range_program(CALIBRATION_FLASH_OFFSET, flash_buffer, FLASH_PAGE_SIZE);
 
     restore_interrupts(interrupts);
-    //multicore_lockout_end_blocking();
 
     CalibrationData verify_data;
     if (!read_calibration(verify_data)) {
