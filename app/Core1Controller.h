@@ -1,6 +1,7 @@
 #pragma once
 
 #include "pico/stdlib.h"
+#include "pico/multicore.h"
 #include "app/SystemCore.h"
 #include "app/Scheduler.h"
 #include "hardware/i2c.h"
@@ -51,7 +52,20 @@ private:
     bool init_impl() {
         printf("Core 1: Initializing...\n");
 
+        // Initialize multicore lockout victim
+        // This allows Core 0 to safely lock out Core 1 during flash operations
+        multicore_lockout_victim_init();
+        printf("Core 1: Multicore lockout victim initialized\n");
+
         QUIT_ON_FAILURE(scale_.init(), "HX711");
+
+        // Load calibration settings from flash
+        if (scale_.load_calibration_settings()) {
+            printf("Core 1: HX711 calibration loaded successfully\n");
+        } else {
+            printf("Core 1: Warning - HX711 calibration load had issues (using defaults)\n");
+        }
+
         // QUIT_ON_FAILURE(ads1115_.init(), "ADS1115");
         // QUIT_ON_FAILURE(ads1115_.start_polling([this](const ADS1115Device::Data& data)
         //     { this->on_ads1115_data(data); }), "ADS1115 polling");

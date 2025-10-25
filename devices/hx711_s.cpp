@@ -9,12 +9,15 @@
 #include "include/hx711_s.h"
 #include "misc/config.settings"
 #include "misc/utility.h"
+#include "misc/flash_storage.h"
 
 using namespace Config;
 
 HX711Device::HX711Device() :
     tare_offset_(HX711::DEFAULT_TARE_OFFSET),
-    scale_factor_(HX711::DEFAULT_SCALE_FACTOR)
+    scale_factor_(HX711::DEFAULT_SCALE_FACTOR),
+    saved_tare_offset_(HX711::DEFAULT_TARE_OFFSET),
+    saved_scale_factor_(HX711::DEFAULT_SCALE_FACTOR)
     {}
 
 HX711Device::~HX711Device() {
@@ -139,7 +142,7 @@ void HX711Device::update(uint16_t samples /* = OVERSAMPLE_COUNT */) {
 
     current_data_.raw = raw;
     current_data_.tared = raw + tare_offset_;
-    current_data_.weight = static_cast<float>(current_data_.tared) / HX711::DEFAULT_SCALE_FACTOR;
+    current_data_.weight = static_cast<float>(current_data_.tared) / scale_factor_;
     current_data_.valid = true;
 }
 
@@ -147,9 +150,10 @@ void HX711Device::zero() {
     calibration_count_ = 0;
     memset(calibration_points_, 0, sizeof(calibration_points_));
 
-    tare_offset_ = HX711::DEFAULT_TARE_OFFSET;
+    // Reset runtime tare to zero (not to saved or default values)
+    tare_offset_ = 0;
 
-    log_device("HX711", "Calibration reset to defaults");
+    log_device("HX711", "Tare offset zeroed (runtime only)");
 }
 
 bool HX711Device::get_calibration_sample(float weight_lbs, uint8_t samples /* = OVERSAMPLE_COUNT */) {
@@ -282,6 +286,78 @@ void HX711Device::stop_polling() {
     if (polling_) {
         polling_ = false;
         log_device("HX711", "Polling stopped");
+    }
+}
+
+bool HX711Device::load_calibration_settings() {
+    FlashStorage::CalibrationData flash_data;
+
+    if (FlashStorage::read_calibration(flash_data)) {
+        // Valid calibration data found in flash
+        saved_tare_offset_ = flash_data.tare_offset;
+        saved_scale_factor_ = flash_data.scale_factor;
+
+        // Update runtime values to match saved values
+        tare_offset_ = saved_tare_offset_;
+        scale_factor_ = saved_scale_factor_;
+
+        log_device("HX711", "Loaded calibration from flash (tare=%d, scale=%.2f)",
+                   tare_offset_, scale_factor_);
+        return true;
+    } else {
+        // No valid calibration found, use compile-time defaults and save them
+        log_device("HX711", "No valid calibration in flash, using defaults");
+
+        saved_tare_offset_ = HX711::DEFAULT_TARE_OFFSET;
+        saved_scale_factor_ = HX711::DEFAULT_SCALE_FACTOR;
+        tare_offset_ = saved_tare_offset_;
+        scale_factor_ = saved_scale_factor_;
+
+        // Save the defaults to flash for next time
+        if (FlashStorage::write_calibration(saved_tare_offset_, saved_scale_factor_)) {
+            log_device("HX711", "Saved default calibration to flash");
+            return true;
+        } else {
+            log_device("HX711", "Warning: Failed to save default calibration to flash");
+            return false;
+        }
+    }
+}
+
+bool HX711Device::save_calibration_settings() {
+    if (!initialized_) {
+        log_device("HX711", "Cannot save calibration - not initialized");
+        return false;
+    }
+
+    // Save current runtime values to flash
+    if (FlashStorage::write_calibration(tare_offset_, scale_factor_)) {
+        // Update saved values to match what was written
+        saved_tare_offset_ = tare_offset_;
+        saved_scale_factor_ = scale_factor_;
+
+        log_device("HX711", "Saved calibration settings (tare=%d, scale=%.2f)",
+                   tare_offset_, scale_factor_);
+        return true;
+    } else {
+        log_device("HX711", "Failed to save calibration settings");
+        return false;
+    }
+}
+
+bool HX711Device::purge_calibration_settings() {
+    if (FlashStorage::erase_calibration()) {
+        // Reset saved values to defaults
+        saved_tare_offset_ = HX711::DEFAULT_TARE_OFFSET;
+        saved_scale_factor_ = HX711::DEFAULT_SCALE_FACTOR;
+
+        // Keep runtime values unchanged - they'll be reset on next init/load
+
+        log_device("HX711", "Purged calibration settings from flash");
+        return true;
+    } else {
+        log_device("HX711", "Failed to purge calibration settings");
+        return false;
     }
 }
 

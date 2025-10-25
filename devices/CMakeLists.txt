@@ -19,9 +19,11 @@ target_link_libraries(${CURRENT_MODULE_NAME}
     PRIVATE
         pico_stdlib
         pico_cxx_options
+        pico_multicore
 
         hardware_gpio
         hardware_i2c
         hardware_timer
         hardware_sync
+        hardware_flash
 )

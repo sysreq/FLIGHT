@@ -39,18 +39,35 @@ public:
     bool start_polling(std::function<void(const Data&)> handler);
     void stop_polling();
 
+    // Persistent calibration management
+    bool load_calibration_settings();
+    bool save_calibration_settings();
+    bool purge_calibration_settings();
+
+    // Getters for current runtime calibration values
     inline const Data& data() const { return current_data_; }
     inline int32_t raw() const { return current_data_.raw; }
     inline int32_t tared() const { return current_data_.tared; }
     inline float weight() const { return current_data_.weight; }
     inline bool valid() const { return current_data_.valid; }
+    inline int32_t get_tare_offset() const { return tare_offset_; }
+    inline float get_scale_factor() const { return scale_factor_; }
+
+    // Getters for saved calibration values
+    inline int32_t get_saved_tare_offset() const { return saved_tare_offset_; }
+    inline float get_saved_scale_factor() const { return saved_scale_factor_; }
 
     inline bool is_polling() const { return polling_; }
     inline uint32_t errors() const { return error_count_; }
 
 private:
+    // Runtime calibration values (can be modified during operation)
     int32_t tare_offset_;
     float scale_factor_;
+
+    // Saved calibration values (loaded from/saved to flash)
+    int32_t saved_tare_offset_;
+    float saved_scale_factor_;
 
     Data current_data_{};
     bool initialized_ = false;
