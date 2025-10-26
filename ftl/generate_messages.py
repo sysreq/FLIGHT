@@ -22,11 +22,12 @@ class Field:
     """Represents a message field"""
     type: str
     name: str
+    offset: int = 0
     is_string: bool = False
     is_array: bool = False
     array_size: int = 0
     element_type: str = ""
-    
+
     @classmethod
     def from_yaml(cls, field_def: dict) -> 'Field':
         """Parse field from YAML definition"""
@@ -59,7 +60,7 @@ class Field:
             type=type_str,
             name=name
         )
-    
+
     @property
     def cpp_type(self) -> str:
         """Get C++ type for field"""
@@ -68,39 +69,39 @@ class Field:
         elif self.is_array:
             return f"std::span<const {self.element_type}>"
         return self.type
-    
+
     @property
     def builder_param_type(self) -> str:
         """Get C++ type for builder parameter"""
         if self.is_string:
             return "std::string_view"
         elif self.is_array:
-            return f"std::span<const {self.element_type}>"
+            return f"std::span<const {self.element_type}, {self.array_size}>"
         return self.type
-    
+
     @property
-    def size_expr(self) -> str:
-        """Get size expression for serialization"""
+    def static_size(self) -> int:
+        """Get static size of the field in bytes"""
         if self.is_string:
-            return f"(1 + {self.name}.size())"  # length byte + data
-        
-        if self.is_array:
-            size_map = {
-                'uint8_t': '1', 'int8_t': '1', 'bool': '1',
-                'uint16_t': '2', 'int16_t': '2',
-                'uint32_t': '4', 'int32_t': '4', 'float': '4',
-                'uint64_t': '8', 'int64_t': '8', 'double': '8',
-            }
-            element_size = size_map.get(self.element_type, f"sizeof({self.element_type})")
-            return f"({element_size} * {self.array_size})"
+            return 1  # Length byte
         
         size_map = {
-            'uint8_t': '1', 'int8_t': '1', 'bool': '1',
-            'uint16_t': '2', 'int16_t': '2',
-            'uint32_t': '4', 'int32_t': '4', 'float': '4',
-            'uint64_t': '8', 'int64_t': '8', 'double': '8',
+            'uint8_t': 1, 'int8_t': 1, 'bool': 1,
+            'uint16_t': 2, 'int16_t': 2,
+            'uint32_t': 4, 'int32_t': 4, 'float': 4,
+            'uint64_t': 8, 'int64_t': 8, 'double': 8,
         }
-        return size_map.get(self.type, f"sizeof({self.type})")
+
+        if self.is_array:
+            element_size = size_map.get(self.element_type, 0)
+            if element_size == 0:
+                raise ValueError(f"Unknown element type: {self.element_type}")
+            return element_size * self.array_size
+        else:
+            size = size_map.get(self.type, 0)
+            if size == 0:
+                raise ValueError(f"Unknown type: {self.type}")
+            return size
 
 @dataclass
 class Message:
@@ -108,38 +109,16 @@ class Message:
     name: str
     fields: List[Field]
     type_id: int
-    
+    has_dynamic_fields: bool = False
+
     @property
-    def max_size(self) -> str:
-        """Calculate maximum message size"""
-        fixed_size = 1  # message type byte
-        has_variable = False
-        
+    def static_size(self) -> int:
+        """Calculate total size of all fixed-size fields"""
+        size = 1  # message type byte
         for field in self.fields:
-            if field.is_string:
-                has_variable = True
-                fixed_size += 1  # just the length byte for sizing
-            elif field.is_array:
-                size_map = {
-                    'uint8_t': 1, 'int8_t': 1, 'bool': 1,
-                    'uint16_t': 2, 'int16_t': 2,
-                    'uint32_t': 4, 'int32_t': 4, 'float': 4,
-                    'uint64_t': 8, 'int64_t': 8, 'double': 8,
-                }
-                element_size = size_map.get(field.element_type, 4)
-                fixed_size += element_size * field.array_size
-            else:
-                size_map = {
-                    'uint8_t': 1, 'int8_t': 1, 'bool': 1,
-                    'uint16_t': 2, 'int16_t': 2,
-                    'uint32_t': 4, 'int32_t': 4, 'float': 4,
-                    'uint64_t': 8, 'int64_t': 8, 'double': 8,
-                }
-                fixed_size += size_map.get(field.type, 4)
-        
-        if has_variable:
-            return f"{fixed_size} + string_data"  # Comment for clarity
-        return str(fixed_size)
+            if not field.is_string:
+                size += field.static_size
+        return size
 
 
 def parse_yaml(yaml_path: Path) -> List[Message]:
@@ -151,10 +130,28 @@ def parse_yaml(yaml_path: Path) -> List[Message]:
     for idx, msg_def in enumerate(data['messages']):
         fields = [Field.from_yaml(field_def) for field_def in msg_def['fields']]
         
+        # Pre-calculate offsets
+        current_offset = 1  # Start after message type byte
+        has_dynamic = False
+        for field in fields:
+            if has_dynamic:
+                field.offset = -1 # Dynamic offset
+            else:
+                field.offset = current_offset
+
+            if field.is_string:
+                has_dynamic = True
+                # For dynamic fields, subsequent field offsets are also dynamic.
+                # The static offset calculation only considers the length byte of the string.
+                current_offset += 1
+            else:
+                current_offset += field.static_size
+
         messages.append(Message(
             name=msg_def['name'],
             fields=fields,
-            type_id=idx
+            type_id=idx,
+            has_dynamic_fields=has_dynamic
         ))
     
     return messages
@@ -193,13 +190,19 @@ def generate_files(messages: List[Message], output_dir: Path, template_dir: Path
     
     print(f"Generating files in {output_dir}...")
     
-    # 1. Generate messages_detail.h
+    # 1. Generate serialization.h
+    print("  - serialization.h")
+    template = env.get_template('serialization.h.j2')
+    content = template.render(context)
+    (output_dir / 'serialization.h').write_text(content)
+
+    # 2. Generate messages_detail.h
     print("  - messages_detail.h")
     template = env.get_template('messages_detail.h.j2')
     content = template.render(context)
     (output_dir / 'messages_detail.h').write_text(content)
     
-    # 2. Generate individual message headers
+    # 3. Generate individual message headers
     message_template = env.get_template('message.h.j2')
     for msg in messages:
         print(f"  - messages/{msg.name}.h")
@@ -207,7 +210,7 @@ def generate_files(messages: List[Message], output_dir: Path, template_dir: Path
         content = message_template.render(msg_context)
         (messages_dir / f'{msg.name}.h').write_text(content)
     
-    # 3. Generate main messages.h
+    # 4. Generate main messages.h
     print("  - messages.h")
     template = env.get_template('messages.h.j2')
     content = template.render(context)

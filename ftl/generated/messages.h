@@ -134,7 +134,7 @@ private:
     // Internal send implementations (one per message type)
     bool send_msg_remote_log(uint32_t timestamp, std::string_view remote_printf);
     bool send_msg_system_state(uint8_t state_id, bool is_active, uint32_t uptime_ms);
-    bool send_msg_sensor_hx711(uint32_t timestamp, std::span<const uint32_t> samples);
+    bool send_msg_sensor_hx711(uint32_t timestamp, std::span<const uint32_t, 10> samples);
     bool send_msg_sensor_ads1115(uint32_t timestamp, float raw_1, float raw_2, float raw_3, float raw_4, float raw_5);
 };
 

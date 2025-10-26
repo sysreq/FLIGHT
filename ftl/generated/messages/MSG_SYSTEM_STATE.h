@@ -1,6 +1,7 @@
 #pragma once
 
 #include "messages_detail.h"
+#include "serialization.h"
 
 /**
  * @file MSG_SYSTEM_STATE.h
@@ -39,33 +40,21 @@ public:
  */
 class MSG_SYSTEM_STATE_View {
 private:
-    const uint8_t* data_;
-    uint8_t length_;
+    serialization::Parser parser_;
     
     friend MessageResult<MSG_SYSTEM_STATE_View> parse_MSG_SYSTEM_STATE(const ftl::MessageHandle&);
     
     MSG_SYSTEM_STATE_View(const uint8_t* data, uint8_t length)
-        : data_(data), length_(length) {}
+        : parser_(data, length)
+        {}
 
 public:
     static constexpr MessageType TYPE = MessageType::MSG_SYSTEM_STATE;
     
     // Field accessors
-    uint8_t state_id() const {
-        size_t offset = 1;  // Skip message type byte
-        return detail::read_primitive<uint8_t>(data_, offset);
-    }
-    bool is_active() const {
-        size_t offset = 1;  // Skip message type byte
-        offset += 1;
-        return detail::read_primitive<bool>(data_, offset);
-    }
-    uint32_t uptime_ms() const {
-        size_t offset = 1;  // Skip message type byte
-        offset += 1;
-        offset += 1;
-        return detail::read_primitive<uint32_t>(data_, offset);
-    }
+    uint8_t state_id() const {return parser_.read<uint8_t>(1);}
+    bool is_active() const {return parser_.read<bool>(2);}
+    uint32_t uptime_ms() const {return parser_.read<uint32_t>(3);}
     
     // Get message type
     MessageType type() const { return TYPE; }
@@ -81,8 +70,8 @@ class MSG_SYSTEM_STATE_Builder {
 private:
     ftl::MessagePoolType::Handle handle_;
     uint8_t* data_;
-    size_t offset_;
     bool valid_;
+    serialization::Serializer serializer_;
     
     ftl::MessagePoolType& get_pool() {
         return get_message_pool();
@@ -92,15 +81,15 @@ public:
     MSG_SYSTEM_STATE_Builder() 
         : handle_(get_pool().acquire())
         , data_(nullptr)
-        , offset_(3)  // Start after [LENGTH][SOURCE][TYPE]
         , valid_(handle_ != ftl::MessagePoolType::INVALID)
+        , serializer_(nullptr, 0)
     {
         if (valid_) {
             data_ = get_pool().get_ptr<uint8_t>(handle_);
             if (data_) {
-                // Buffer layout: [LENGTH][SOURCE][TYPE][FIELDS...]
-                // Length and Source will be filled in build()
-                data_[2] = static_cast<uint8_t>(MessageType::MSG_SYSTEM_STATE);
+                serializer_ = serialization::Serializer(data_ + 3, ftl_config::MAX_PAYLOAD_SIZE - 3);
+                serializer_.write(0, static_cast<uint8_t>(MessageType::MSG_SYSTEM_STATE));
+                serializer_.set_dynamic_offset(7);
             } else {
                 valid_ = false;
             }
@@ -120,41 +109,29 @@ public:
     MSG_SYSTEM_STATE_Builder(MSG_SYSTEM_STATE_Builder&& other) noexcept
         : handle_(other.handle_)
         , data_(other.data_)
-        , offset_(other.offset_)
         , valid_(other.valid_)
+        , serializer_(other.serializer_)
     {
         other.handle_ = ftl::MessagePoolType::INVALID;
         other.valid_ = false;
     }
     
     MSG_SYSTEM_STATE_Builder& state_id(uint8_t value) {
-        if (valid_ && data_) {
-            if (offset_ + sizeof(uint8_t) <= ftl_config::MAX_PAYLOAD_SIZE) {
-                detail::write_primitive(data_, offset_, value);
-            } else {
+        if (valid_) {if (!serializer_.write<uint8_t>(1, value)) {
                 valid_ = false;
-            }
-        }
+            }}
         return *this;
     }
     MSG_SYSTEM_STATE_Builder& is_active(bool value) {
-        if (valid_ && data_) {
-            if (offset_ + sizeof(bool) <= ftl_config::MAX_PAYLOAD_SIZE) {
-                detail::write_primitive(data_, offset_, value);
-            } else {
+        if (valid_) {if (!serializer_.write<bool>(2, value)) {
                 valid_ = false;
-            }
-        }
+            }}
         return *this;
     }
     MSG_SYSTEM_STATE_Builder& uptime_ms(uint32_t value) {
-        if (valid_ && data_) {
-            if (offset_ + sizeof(uint32_t) <= ftl_config::MAX_PAYLOAD_SIZE) {
-                detail::write_primitive(data_, offset_, value);
-            } else {
+        if (valid_) {if (!serializer_.write<uint32_t>(3, value)) {
                 valid_ = false;
-            }
-        }
+            }}
         return *this;
     }
     
@@ -171,20 +148,15 @@ public:
             return ftl::MessageHandle{};
         }
         
-        // Calculate payload length: offset - 2 (skip LENGTH and SOURCE bytes)
-        uint8_t payload_length = static_cast<uint8_t>(offset_ - 2);
+        uint8_t payload_length = static_cast<uint8_t>(serializer_.dynamic_offset());
         
-        // Set buffer header: [LENGTH][SOURCE][TYPE][FIELDS...]
-        data_[0] = payload_length;                      // Payload length
-        data_[1] = ftl::get_my_source_id();        // Source ID
-        // data_[2] already set to message type in constructor
+        data_[0] = payload_length;
+        data_[1] = ftl::get_my_source_id();
         
-        // Create MessageHandle with the raw handle
         auto msg_handle = ftl::MessageHandle(
             MsgHandle<ftl::MessagePoolType>(get_pool(), handle_)
         );
         
-        // Transfer ownership
         handle_ = ftl::MessagePoolType::INVALID;
         valid_ = false;
         

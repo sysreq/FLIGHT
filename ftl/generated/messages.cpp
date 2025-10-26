@@ -45,58 +45,97 @@ ftl::MessagePoolType& get_message_pool() {
 }
 
 // =============================================================================
-// Default Print Handlers
+// Generic Print Helper
 // =============================================================================
 
-void default_MSG_REMOTE_LOG_handler(const MSG_REMOTE_LOG_View& msg) {
-    printf("MSG_REMOTE_LOG: ");
-    printf("timestamp=%u", msg.timestamp());
-    printf(", ");
-    printf("remote_printf='%.*s'", 
-           static_cast<int>(msg.remote_printf().size()), 
-           msg.remote_printf().data());
-    printf("\n");
-}
-
-void default_MSG_SYSTEM_STATE_handler(const MSG_SYSTEM_STATE_View& msg) {
-    printf("MSG_SYSTEM_STATE: ");
-    printf("state_id=%u", msg.state_id());
-    printf(", ");
-    printf("is_active=%s", msg.is_active() ? "true" : "false");
-    printf(", ");
-    printf("uptime_ms=%u", msg.uptime_ms());
-    printf("\n");
-}
-
-void default_MSG_SENSOR_HX711_handler(const MSG_SENSOR_HX711_View& msg) {
-    printf("MSG_SENSOR_HX711: ");
-    printf("timestamp=%u", msg.timestamp());
-    printf(", ");
-    {
-        auto arr = msg.samples();
-        printf("samples=[");
-        for (size_t i = 0; i < arr.size(); ++i) {
-            printf("%u", arr[i]);
-            if (i < arr.size() - 1) printf(", ");
+namespace detail {
+template<typename T>
+void print_field(const char* name, T value) {
+    printf("%s=", name);
+    if constexpr (std::is_same_v<T, bool>) {
+        printf("%s", value ? "true" : "false");
+    } else if constexpr (std::is_floating_point_v<T>) {
+        printf("%.2f", value);
+    } else if constexpr (std::is_integral_v<T>) {
+        if constexpr (std::is_signed_v<T>) {
+            printf("%lld", static_cast<long long>(value));
+        } else {
+            printf("%llu", static_cast<unsigned long long>(value));
         }
-        printf("]");
+    } else {
+        printf("?");
     }
-    printf("\n");
 }
 
-void default_MSG_SENSOR_ADS1115_handler(const MSG_SENSOR_ADS1115_View& msg) {
-    printf("MSG_SENSOR_ADS1115: ");
-    printf("timestamp=%u", msg.timestamp());
-    printf(", ");
-    printf("raw_1=%.2f", msg.raw_1());
-    printf(", ");
-    printf("raw_2=%.2f", msg.raw_2());
-    printf(", ");
-    printf("raw_3=%.2f", msg.raw_3());
-    printf(", ");
-    printf("raw_4=%.2f", msg.raw_4());
-    printf(", ");
-    printf("raw_5=%.2f", msg.raw_5());
+template<typename T>
+void print_field(const char* name, std::span<const T> value) {
+    printf("%s=[", name);
+    for (size_t i = 0; i < value.size(); ++i) {
+        print_field("", value[i]);
+        if (i < value.size() - 1) printf(", ");
+    }
+    printf("]");
+}
+
+void print_field(const char* name, std::string_view value) {
+    printf("%s='%.*s'", name, static_cast<int>(value.size()), value.data());
+}
+} // namespace detail
+
+void print_message(const ftl::MessageHandle& handle) {
+    if (!handle.is_valid()) {
+        printf("Invalid message\n");
+        return;
+    }
+
+    MessageType type = static_cast<MessageType>(handle.data()[0]);
+    printf("%s: ", message_type_name(type));
+
+    switch (type) {
+    case MessageType::MSG_REMOTE_LOG: {
+        auto view_res = parse_MSG_REMOTE_LOG(handle);
+        if (view_res) {
+            auto& view = *view_res;
+            detail::print_field("timestamp", view.timestamp());
+printf(", ");            detail::print_field("remote_printf", view.remote_printf());
+        }
+        break;
+    }
+    case MessageType::MSG_SYSTEM_STATE: {
+        auto view_res = parse_MSG_SYSTEM_STATE(handle);
+        if (view_res) {
+            auto& view = *view_res;
+            detail::print_field("state_id", view.state_id());
+printf(", ");            detail::print_field("is_active", view.is_active());
+printf(", ");            detail::print_field("uptime_ms", view.uptime_ms());
+        }
+        break;
+    }
+    case MessageType::MSG_SENSOR_HX711: {
+        auto view_res = parse_MSG_SENSOR_HX711(handle);
+        if (view_res) {
+            auto& view = *view_res;
+            detail::print_field("timestamp", view.timestamp());
+printf(", ");            detail::print_field("samples", view.samples());
+        }
+        break;
+    }
+    case MessageType::MSG_SENSOR_ADS1115: {
+        auto view_res = parse_MSG_SENSOR_ADS1115(handle);
+        if (view_res) {
+            auto& view = *view_res;
+            detail::print_field("timestamp", view.timestamp());
+printf(", ");            detail::print_field("raw_1", view.raw_1());
+printf(", ");            detail::print_field("raw_2", view.raw_2());
+printf(", ");            detail::print_field("raw_3", view.raw_3());
+printf(", ");            detail::print_field("raw_4", view.raw_4());
+printf(", ");            detail::print_field("raw_5", view.raw_5());
+        }
+        break;
+    }
+    default:
+        printf("Unknown message");
+    }
     printf("\n");
 }
 
@@ -106,11 +145,39 @@ void default_MSG_SENSOR_ADS1115_handler(const MSG_SENSOR_ADS1115_View& msg) {
 // =============================================================================
 
 Dispatcher::Dispatcher() {
-    // Initialize all handlers with defaults
-    msg_remote_log_handler_ = default_MSG_REMOTE_LOG_handler;
-    msg_system_state_handler_ = default_MSG_SYSTEM_STATE_handler;
-    msg_sensor_hx711_handler_ = default_MSG_SENSOR_HX711_handler;
-    msg_sensor_ads1115_handler_ = default_MSG_SENSOR_ADS1115_handler;
+    // Initialize all handlers with a generic print handler
+    msg_remote_log_handler_ = [](const MSG_REMOTE_LOG_View& msg) {
+        // This is a bit of a hack to get the handle back
+        // A better solution would be to pass the handle to the handler
+        auto& pool = get_message_pool();
+        auto* handle_ptr = reinterpret_cast<const ftl::MessageHandle*>(
+            reinterpret_cast<const uint8_t*>(&msg) - offsetof(ftl::MessageHandle, data_));
+        print_message(*handle_ptr);
+    };
+    msg_system_state_handler_ = [](const MSG_SYSTEM_STATE_View& msg) {
+        // This is a bit of a hack to get the handle back
+        // A better solution would be to pass the handle to the handler
+        auto& pool = get_message_pool();
+        auto* handle_ptr = reinterpret_cast<const ftl::MessageHandle*>(
+            reinterpret_cast<const uint8_t*>(&msg) - offsetof(ftl::MessageHandle, data_));
+        print_message(*handle_ptr);
+    };
+    msg_sensor_hx711_handler_ = [](const MSG_SENSOR_HX711_View& msg) {
+        // This is a bit of a hack to get the handle back
+        // A better solution would be to pass the handle to the handler
+        auto& pool = get_message_pool();
+        auto* handle_ptr = reinterpret_cast<const ftl::MessageHandle*>(
+            reinterpret_cast<const uint8_t*>(&msg) - offsetof(ftl::MessageHandle, data_));
+        print_message(*handle_ptr);
+    };
+    msg_sensor_ads1115_handler_ = [](const MSG_SENSOR_ADS1115_View& msg) {
+        // This is a bit of a hack to get the handle back
+        // A better solution would be to pass the handle to the handler
+        auto& pool = get_message_pool();
+        auto* handle_ptr = reinterpret_cast<const ftl::MessageHandle*>(
+            reinterpret_cast<const uint8_t*>(&msg) - offsetof(ftl::MessageHandle, data_));
+        print_message(*handle_ptr);
+    };
 }
 
 void Dispatcher::dispatch(ftl::MessageHandle& handle) {
@@ -206,7 +273,7 @@ bool Dispatcher::send_msg_system_state(uint8_t state_id, bool is_active, uint32_
     return false;
 }
 
-bool Dispatcher::send_msg_sensor_hx711(uint32_t timestamp, std::span<const uint32_t> samples) {
+bool Dispatcher::send_msg_sensor_hx711(uint32_t timestamp, std::span<const uint32_t, 10> samples) {
     auto msg = MSG_SENSOR_HX711::Builder()
         .timestamp(timestamp)
         .samples(samples)

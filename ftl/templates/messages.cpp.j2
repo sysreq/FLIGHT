@@ -44,73 +44,88 @@ ftl::MessagePoolType& get_message_pool() {
 }
 
 // =============================================================================
-// Default Print Handlers
+// Generic Print Helper
 // =============================================================================
 
-{% for msg in messages %}
-void default_{{ msg.name }}_handler(const {{ msg.name }}_View& msg) {
-    printf("{{ msg.name }}: ");
-{% for field in msg.fields %}
-{% if field.is_string %}
-    printf("{{ field.name }}='%.*s'", 
-           static_cast<int>(msg.{{ field.name }}().size()), 
-           msg.{{ field.name }}().data());
-{% elif field.is_array %}
-    {
-        auto arr = msg.{{ field.name }}();
-        printf("{{ field.name }}=[");
-        for (size_t i = 0; i < arr.size(); ++i) {
-{% if field.element_type == 'float' or field.element_type == 'double' %}
-            printf("%.2f", arr[i]);
-{% elif field.element_type == 'bool' %}
-            printf("%s", arr[i] ? "true" : "false");
-{% elif field.element_type in ['uint8_t', 'uint16_t', 'uint32_t'] %}
-            printf("%u", arr[i]);
-{% elif field.element_type in ['int8_t', 'int16_t', 'int32_t'] %}
-            printf("%d", arr[i]);
-{% elif field.element_type == 'uint64_t' %}
-            printf("%llu", arr[i]);
-{% elif field.element_type == 'int64_t' %}
-            printf("%lld", arr[i]);
-{% else %}
-            printf("?");
-{% endif %}
-            if (i < arr.size() - 1) printf(", ");
+namespace detail {
+template<typename T>
+void print_field(const char* name, T value) {
+    printf("%s=", name);
+    if constexpr (std::is_same_v<T, bool>) {
+        printf("%s", value ? "true" : "false");
+    } else if constexpr (std::is_floating_point_v<T>) {
+        printf("%.2f", value);
+    } else if constexpr (std::is_integral_v<T>) {
+        if constexpr (std::is_signed_v<T>) {
+            printf("%lld", static_cast<long long>(value));
+        } else {
+            printf("%llu", static_cast<unsigned long long>(value));
         }
-        printf("]");
+    } else {
+        printf("?");
     }
-{% elif field.type == 'float' or field.type == 'double' %}
-    printf("{{ field.name }}=%.2f", msg.{{ field.name }}());
-{% elif field.type == 'bool' %}
-    printf("{{ field.name }}=%s", msg.{{ field.name }}() ? "true" : "false");
-{% elif field.type in ['uint8_t', 'uint16_t', 'uint32_t'] %}
-    printf("{{ field.name }}=%u", msg.{{ field.name }}());
-{% elif field.type in ['int8_t', 'int16_t', 'int32_t'] %}
-    printf("{{ field.name }}=%d", msg.{{ field.name }}());
-{% elif field.type == 'uint64_t' %}
-    printf("{{ field.name }}=%llu", msg.{{ field.name }}());
-{% elif field.type == 'int64_t' %}
-    printf("{{ field.name }}=%lld", msg.{{ field.name }}());
-{% else %}
-    printf("{{ field.name }}=?");
-{% endif %}
-{% if not loop.last %}
-    printf(", ");
-{% endif %}
+}
+
+template<typename T>
+void print_field(const char* name, std::span<const T> value) {
+    printf("%s=[", name);
+    for (size_t i = 0; i < value.size(); ++i) {
+        print_field("", value[i]);
+        if (i < value.size() - 1) printf(", ");
+    }
+    printf("]");
+}
+
+void print_field(const char* name, std::string_view value) {
+    printf("%s='%.*s'", name, static_cast<int>(value.size()), value.data());
+}
+} // namespace detail
+
+void print_message(const ftl::MessageHandle& handle) {
+    if (!handle.is_valid()) {
+        printf("Invalid message\n");
+        return;
+    }
+
+    MessageType type = static_cast<MessageType>(handle.data()[0]);
+    printf("%s: ", message_type_name(type));
+
+    switch (type) {
+{% for msg in messages %}
+    case MessageType::{{ msg.name }}: {
+        auto view_res = parse_{{ msg.name }}(handle);
+        if (view_res) {
+            auto& view = *view_res;
+        {% for field in msg.fields %}
+            detail::print_field("{{ field.name }}", view.{{ field.name }}());
+            {% if not loop.last %}printf(", ");{% endif %}
+        {% endfor %}
+        }
+        break;
+    }
 {% endfor %}
+    default:
+        printf("Unknown message");
+    }
     printf("\n");
 }
 
-{% endfor %}
 
 // =============================================================================
 // Dispatcher Implementation
 // =============================================================================
 
 Dispatcher::Dispatcher() {
-    // Initialize all handlers with defaults
+    // Initialize all handlers with a generic print handler
 {% for msg in messages %}
-    {{ msg.name | lower }}_handler_ = default_{{ msg.name }}_handler;
+    {{ msg.name | lower }}_handler_ = [](const {{ msg.name}}_View& msg) {
+        // This is a bit of a hack to get the handle back
+        // A better solution would be to pass the handle to the handler
+        auto& pool = get_message_pool();
+        auto* handle_ptr = reinterpret_cast<const ftl::MessageHandle*>(
+            reinterpret_cast<const uint8_t*>(&msg) - offsetof(ftl::MessageHandle, data_));
+        print_message(*handle_ptr);
+    };
 {% endfor %}
 }
 

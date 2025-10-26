@@ -1,6 +1,7 @@
 #pragma once
 
 #include "messages_detail.h"
+#include "serialization.h"
 
 /**
  * @file MSG_SENSOR_HX711.h
@@ -39,27 +40,20 @@ public:
  */
 class MSG_SENSOR_HX711_View {
 private:
-    const uint8_t* data_;
-    uint8_t length_;
+    serialization::Parser parser_;
     
     friend MessageResult<MSG_SENSOR_HX711_View> parse_MSG_SENSOR_HX711(const ftl::MessageHandle&);
     
     MSG_SENSOR_HX711_View(const uint8_t* data, uint8_t length)
-        : data_(data), length_(length) {}
+        : parser_(data, length)
+        {}
 
 public:
     static constexpr MessageType TYPE = MessageType::MSG_SENSOR_HX711;
     
     // Field accessors
-    uint32_t timestamp() const {
-        size_t offset = 1;  // Skip message type byte
-        return detail::read_primitive<uint32_t>(data_, offset);
-    }
-    std::span<const uint32_t> samples() const {
-        size_t offset = 1;  // Skip message type byte
-        offset += 4;
-        return detail::read_array<uint32_t, 10>(data_, offset, length_);
-    }
+    uint32_t timestamp() const {return parser_.read<uint32_t>(1);}
+    std::span<const uint32_t> samples() const {return parser_.read_array<uint32_t, 10>(5);}
     
     // Get message type
     MessageType type() const { return TYPE; }
@@ -75,8 +69,8 @@ class MSG_SENSOR_HX711_Builder {
 private:
     ftl::MessagePoolType::Handle handle_;
     uint8_t* data_;
-    size_t offset_;
     bool valid_;
+    serialization::Serializer serializer_;
     
     ftl::MessagePoolType& get_pool() {
         return get_message_pool();
@@ -86,15 +80,15 @@ public:
     MSG_SENSOR_HX711_Builder() 
         : handle_(get_pool().acquire())
         , data_(nullptr)
-        , offset_(3)  // Start after [LENGTH][SOURCE][TYPE]
         , valid_(handle_ != ftl::MessagePoolType::INVALID)
+        , serializer_(nullptr, 0)
     {
         if (valid_) {
             data_ = get_pool().get_ptr<uint8_t>(handle_);
             if (data_) {
-                // Buffer layout: [LENGTH][SOURCE][TYPE][FIELDS...]
-                // Length and Source will be filled in build()
-                data_[2] = static_cast<uint8_t>(MessageType::MSG_SENSOR_HX711);
+                serializer_ = serialization::Serializer(data_ + 3, ftl_config::MAX_PAYLOAD_SIZE - 3);
+                serializer_.write(0, static_cast<uint8_t>(MessageType::MSG_SENSOR_HX711));
+                serializer_.set_dynamic_offset(45);
             } else {
                 valid_ = false;
             }
@@ -114,36 +108,24 @@ public:
     MSG_SENSOR_HX711_Builder(MSG_SENSOR_HX711_Builder&& other) noexcept
         : handle_(other.handle_)
         , data_(other.data_)
-        , offset_(other.offset_)
         , valid_(other.valid_)
+        , serializer_(other.serializer_)
     {
         other.handle_ = ftl::MessagePoolType::INVALID;
         other.valid_ = false;
     }
     
     MSG_SENSOR_HX711_Builder& timestamp(uint32_t value) {
-        if (valid_ && data_) {
-            if (offset_ + sizeof(uint32_t) <= ftl_config::MAX_PAYLOAD_SIZE) {
-                detail::write_primitive(data_, offset_, value);
-            } else {
+        if (valid_) {if (!serializer_.write<uint32_t>(1, value)) {
                 valid_ = false;
-            }
-        }
+            }}
         return *this;
     }
-    // Accept std::span<const uint32_t>
-    MSG_SENSOR_HX711_Builder& samples(std::span<const uint32_t> values) {
-        if (valid_ && data_) {
-            if (!detail::write_array<uint32_t, 10>(data_, offset_, ftl_config::MAX_PAYLOAD_SIZE, values)) {
+    MSG_SENSOR_HX711_Builder& samples(std::span<const uint32_t, 10> value) {
+        if (valid_) {if (!serializer_.write_array<uint32_t, 10>(5, value)) {
                 valid_ = false;
-            }
-        }
+            }}
         return *this;
-    }
-    
-    // Accept std::array<uint32_t, 10>
-    MSG_SENSOR_HX711_Builder& samples(const std::array<uint32_t, 10>& values) {
-        return samples(std::span<const uint32_t>(values.data(), 10));
     }
     
     /**
@@ -159,20 +141,15 @@ public:
             return ftl::MessageHandle{};
         }
         
-        // Calculate payload length: offset - 2 (skip LENGTH and SOURCE bytes)
-        uint8_t payload_length = static_cast<uint8_t>(offset_ - 2);
+        uint8_t payload_length = static_cast<uint8_t>(serializer_.dynamic_offset());
         
-        // Set buffer header: [LENGTH][SOURCE][TYPE][FIELDS...]
-        data_[0] = payload_length;                      // Payload length
-        data_[1] = ftl::get_my_source_id();        // Source ID
-        // data_[2] already set to message type in constructor
+        data_[0] = payload_length;
+        data_[1] = ftl::get_my_source_id();
         
-        // Create MessageHandle with the raw handle
         auto msg_handle = ftl::MessageHandle(
             MsgHandle<ftl::MessagePoolType>(get_pool(), handle_)
         );
         
-        // Transfer ownership
         handle_ = ftl::MessagePoolType::INVALID;
         valid_ = false;
         

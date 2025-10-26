@@ -1,6 +1,7 @@
 #pragma once
 
 #include "messages_detail.h"
+#include "serialization.h"
 
 /**
  * @file {{ msg.name }}.h
@@ -39,62 +40,34 @@ public:
  */
 class {{ msg.name }}_View {
 private:
-    const uint8_t* data_;
-    uint8_t length_;
+    serialization::Parser parser_;
+    {% if msg.has_dynamic_fields %}
+    mutable size_t dynamic_offset_;
+    {% endif %}
     
     friend MessageResult<{{ msg.name }}_View> parse_{{ msg.name }}(const ftl::MessageHandle&);
     
     {{ msg.name }}_View(const uint8_t* data, uint8_t length)
-        : data_(data), length_(length) {}
+        : parser_(data, length)
+        {% if msg.has_dynamic_fields %}
+        , dynamic_offset_({{ msg.static_size }})
+        {% endif %}
+        {}
 
 public:
     static constexpr MessageType TYPE = MessageType::{{ msg.name }};
     
     // Field accessors
 {% for field in msg.fields %}
-{% if field.is_string %}
-    std::string_view {{ field.name }}() const {
-        size_t offset = 1;  // Skip message type byte
-{% for prev_field in msg.fields[:loop.index0] %}
-{% if prev_field.is_string %}
-        detail::read_string(data_, offset, length_);  // Skip previous string
-{% elif prev_field.is_array %}
-        offset += {{ prev_field.size_expr }};  // Skip array
-{% else %}
-        offset += {{ prev_field.size_expr }};
-{% endif %}
-{% endfor %}
-        return detail::read_string(data_, offset, length_);
-    }
-{% elif field.is_array %}
     {{ field.cpp_type }} {{ field.name }}() const {
-        size_t offset = 1;  // Skip message type byte
-{% for prev_field in msg.fields[:loop.index0] %}
-{% if prev_field.is_string %}
-        detail::read_string(data_, offset, length_);  // Skip previous string
-{% elif prev_field.is_array %}
-        offset += {{ prev_field.size_expr }};  // Skip array
-{% else %}
-        offset += {{ prev_field.size_expr }};
-{% endif %}
-{% endfor %}
-        return detail::read_array<{{ field.element_type }}, {{ field.array_size }}>(data_, offset, length_);
+    {%- if field.is_string -%}
+        return parser_.read_string(dynamic_offset_);
+    {%- elif field.is_array -%}
+        return parser_.read_array<{{ field.element_type }}, {{ field.array_size }}>({{ field.offset }});
+    {%- else -%}
+        return parser_.read<{{ field.type }}>({{ field.offset }});
+    {%- endif -%}
     }
-{% else %}
-    {{ field.cpp_type }} {{ field.name }}() const {
-        size_t offset = 1;  // Skip message type byte
-{% for prev_field in msg.fields[:loop.index0] %}
-{% if prev_field.is_string %}
-        detail::read_string(data_, offset, length_);  // Skip previous string
-{% elif prev_field.is_array %}
-        offset += {{ prev_field.size_expr }};  // Skip array
-{% else %}
-        offset += {{ prev_field.size_expr }};
-{% endif %}
-{% endfor %}
-        return detail::read_primitive<{{ field.type }}>(data_, offset);
-    }
-{% endif %}
 {% endfor %}
     
     // Get message type
@@ -111,8 +84,8 @@ class {{ msg.name }}_Builder {
 private:
     ftl::MessagePoolType::Handle handle_;
     uint8_t* data_;
-    size_t offset_;
     bool valid_;
+    serialization::Serializer serializer_;
     
     ftl::MessagePoolType& get_pool() {
         return get_message_pool();
@@ -122,15 +95,15 @@ public:
     {{ msg.name }}_Builder() 
         : handle_(get_pool().acquire())
         , data_(nullptr)
-        , offset_(3)  // Start after [LENGTH][SOURCE][TYPE]
         , valid_(handle_ != ftl::MessagePoolType::INVALID)
+        , serializer_(nullptr, 0)
     {
         if (valid_) {
             data_ = get_pool().get_ptr<uint8_t>(handle_);
             if (data_) {
-                // Buffer layout: [LENGTH][SOURCE][TYPE][FIELDS...]
-                // Length and Source will be filled in build()
-                data_[2] = static_cast<uint8_t>(MessageType::{{ msg.name }});
+                serializer_ = serialization::Serializer(data_ + 3, ftl_config::MAX_PAYLOAD_SIZE - 3);
+                serializer_.write(0, static_cast<uint8_t>(MessageType::{{ msg.name }}));
+                serializer_.set_dynamic_offset({{ msg.static_size }});
             } else {
                 valid_ = false;
             }
@@ -150,50 +123,34 @@ public:
     {{ msg.name }}_Builder({{ msg.name }}_Builder&& other) noexcept
         : handle_(other.handle_)
         , data_(other.data_)
-        , offset_(other.offset_)
         , valid_(other.valid_)
+        , serializer_(other.serializer_)
     {
         other.handle_ = ftl::MessagePoolType::INVALID;
         other.valid_ = false;
     }
     
 {% for field in msg.fields %}
-{% if field.is_string %}
-    {{ msg.name }}_Builder& {{ field.name }}(std::string_view value) {
-        if (valid_ && data_) {
-            if (!detail::write_string(data_, offset_, ftl_config::MAX_PAYLOAD_SIZE, value)) {
+    {{ msg.name }}_Builder& {{ field.name }}({{ field.builder_param_type }} value) {
+        if (valid_) {
+        {%- if field.is_string -%}
+            size_t current_offset = serializer_.dynamic_offset();
+            if (!serializer_.write_string(current_offset, value)) {
                 valid_ = false;
             }
+            serializer_.set_dynamic_offset(current_offset);
+        {%- elif field.is_array -%}
+            if (!serializer_.write_array<{{ field.element_type }}, {{ field.array_size }}>({{ field.offset }}, value)) {
+                valid_ = false;
+            }
+        {%- else -%}
+            if (!serializer_.write<{{ field.type }}>({{ field.offset }}, value)) {
+                valid_ = false;
+            }
+        {%- endif -%}
         }
         return *this;
     }
-{% elif field.is_array %}
-    // Accept std::span<const {{ field.element_type }}>
-    {{ msg.name }}_Builder& {{ field.name }}({{ field.builder_param_type }} values) {
-        if (valid_ && data_) {
-            if (!detail::write_array<{{ field.element_type }}, {{ field.array_size }}>(data_, offset_, ftl_config::MAX_PAYLOAD_SIZE, values)) {
-                valid_ = false;
-            }
-        }
-        return *this;
-    }
-    
-    // Accept std::array<{{ field.element_type }}, {{ field.array_size }}>
-    {{ msg.name }}_Builder& {{ field.name }}(const std::array<{{ field.element_type }}, {{ field.array_size }}>& values) {
-        return {{ field.name }}(std::span<const {{ field.element_type }}>(values.data(), {{ field.array_size }}));
-    }
-{% else %}
-    {{ msg.name }}_Builder& {{ field.name }}({{ field.cpp_type }} value) {
-        if (valid_ && data_) {
-            if (offset_ + sizeof({{ field.type }}) <= ftl_config::MAX_PAYLOAD_SIZE) {
-                detail::write_primitive(data_, offset_, value);
-            } else {
-                valid_ = false;
-            }
-        }
-        return *this;
-    }
-{% endif %}
 {% endfor %}
     
     /**
@@ -209,20 +166,15 @@ public:
             return ftl::MessageHandle{};
         }
         
-        // Calculate payload length: offset - 2 (skip LENGTH and SOURCE bytes)
-        uint8_t payload_length = static_cast<uint8_t>(offset_ - 2);
+        uint8_t payload_length = static_cast<uint8_t>(serializer_.dynamic_offset());
         
-        // Set buffer header: [LENGTH][SOURCE][TYPE][FIELDS...]
-        data_[0] = payload_length;                      // Payload length
-        data_[1] = ftl::get_my_source_id();        // Source ID
-        // data_[2] already set to message type in constructor
+        data_[0] = payload_length;
+        data_[1] = ftl::get_my_source_id();
         
-        // Create MessageHandle with the raw handle
         auto msg_handle = ftl::MessageHandle(
             MsgHandle<ftl::MessagePoolType>(get_pool(), handle_)
         );
         
-        // Transfer ownership
         handle_ = ftl::MessagePoolType::INVALID;
         valid_ = false;
         
