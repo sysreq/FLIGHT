@@ -765,7 +765,7 @@ bool rp2040_sdio_init(sd_card_t *sd_card_p, float clk_div) {
 
         /* Set up IRQ handler for when DMA completes. */
         dma_irq_add_handler(sd_card_p->sdio_if_p->DMA_IRQ_num,
-                            sd_card_p->sdio_if_p->use_exclusive_DMA_IRQ_handler);
+                            false);
 
         STATE.resources_claimed = true;
     }

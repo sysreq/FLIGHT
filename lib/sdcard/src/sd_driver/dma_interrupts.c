@@ -8,19 +8,16 @@ static void dma_irq_handler(const uint DMA_IRQ_num, io_rw_32 *dma_hw_ints_p) {
     // Iterate through all of the SD cards
     for (size_t i = 0; i < sd_get_num(); ++i) {
         sd_card_t *sd_card_p = sd_get_by_num(i);
-        if (!sd_card_p)
+        if (!sd_card_p || sd_card_p->type != SD_IF_SDIO) {
             continue;
-        uint irq_num = 0, channel = 0;
-        if (SD_IF_SDIO == sd_card_p->type) {
-            irq_num = sd_card_p->sdio_if_p->DMA_IRQ_num;
-            channel = sd_card_p->sdio_if_p->state.SDIO_DMA_CHB;
         }
+        uint irq_num = sd_card_p->sdio_if_p->DMA_IRQ_num;
+        uint channel = sd_card_p->sdio_if_p->state.SDIO_DMA_CHB;
+
         // Is this channel requesting interrupt?
         if (irq_num == DMA_IRQ_num && (*dma_hw_ints_p & (1 << channel))) {
             *dma_hw_ints_p = 1 << channel;  // Clear it.
-            if (SD_IF_SDIO == sd_card_p->type) {
-                sdio_irq_handler(sd_card_p);
-            }
+            sdio_irq_handler(sd_card_p);
         }
     }
 }
