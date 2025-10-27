@@ -17,7 +17,7 @@ else()
     set(USERHOME $ENV{HOME})
 endif()
 set(sdkVersion 2.2.0)
-set(toolchainVersion 14_2_Rel1)
+set(toolchainVersion 14_3_Rel1)
 set(picotoolVersion 2.2.0)
 set(picoVscode ${USERHOME}/.pico-sdk/cmake/pico-vscode.cmake)
 if (EXISTS ${picoVscode})
@@ -30,8 +30,6 @@ include(pico_sdk_import.cmake)
 project(FLIGHT C CXX ASM)
 
 pico_sdk_init()
-
-add_subdirectory(network)
 
 add_executable(FLIGHT main.cpp)
 
@@ -52,10 +50,7 @@ target_link_libraries(pico_bundle INTERFACE
     pico_multicore
     pico_bootrom
     pico_sync
-    
-    # WiFi support (if using Pico W)
-    pico_cyw43_arch_lwip_poll
-    
+        
     # Hardware interfaces
     hardware_resets
     hardware_clocks
@@ -77,16 +72,13 @@ target_link_libraries(pico_bundle INTERFACE
 target_link_libraries(FLIGHT
     pico_bundle
     third_party
-    network
 )
 
 # Add the standard include files to the build
 target_include_directories(FLIGHT PRIVATE
         ${CMAKE_CURRENT_LIST_DIR}
-        ${CMAKE_CURRENT_LIST_DIR}/i2c
         ${CMAKE_CURRENT_LIST_DIR}/sdcard
         ${CMAKE_CURRENT_LIST_DIR}/lib
-        ${CMAKE_CURRENT_LIST_DIR}/network/platform
 )
 
 # Linker options

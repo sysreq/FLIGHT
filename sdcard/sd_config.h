@@ -48,10 +48,10 @@ namespace sdcard {
 // ============================================
 namespace hw {
     inline spi_inst_t* const SPI_BUS = spi0;
-    inline constexpr uint8_t MISO = 16;
-    inline constexpr uint8_t CS = 17;
-    inline constexpr uint8_t SCK = 18;
-    inline constexpr uint8_t MOSI = 19;
+    inline constexpr uint8_t MISO = 0;
+    inline constexpr uint8_t CS = 1;
+    inline constexpr uint8_t SCK = 2;
+    inline constexpr uint8_t MOSI = 3;
     inline constexpr uint32_t SPI_FREQ_HZ = 31250000;  // 31.25MHz
     
     // DMA Configuration
