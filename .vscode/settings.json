@@ -39,6 +39,11 @@
     "raspberry-pi-pico.ninjaPath": "${HOME}/.pico-sdk/ninja/v1.13.1/ninja",
     "files.associations": {
         "atomic": "cpp",
-        "cmath": "cpp"
+        "cmath": "cpp",
+        "stdlib.h": "c",
+        "sd_card.h": "c",
+        "string.h": "c",
+        "random": "c",
+        "rp2350.h": "c"
     }
 }

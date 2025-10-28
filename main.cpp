@@ -7,6 +7,8 @@
 
 #include "sdcard.h"
 
+const char* build_timestamp = "011 @ " __DATE__ " " __TIME__;
+
 int main() {
     stdio_init_all();
     sleep_ms(5000);
@@ -18,14 +20,14 @@ int main() {
         printf("Mount: Failed.\n");
         sleep_ms(1000);
     }
-
+ 
     if (!sdcard::SDFile<sdcard::LogFile>::Open()) { 
         printf("Open: Failed.\n");
         return -1;
     }
     
     printf("Core 0: File System Started.\n");
-    sdcard::SDFile<sdcard::LogFile>::Write("Device Started.\n");
+    sdcard::SDFile<sdcard::LogFile>::Write("Device Started: %s.\n", build_timestamp);
     sdcard::SDFile<sdcard::LogFile>::Sync(); 
 
     sleep_ms(1000);

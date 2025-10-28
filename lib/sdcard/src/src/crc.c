@@ -1,22 +1,3 @@
-/* crc.c
-Copyright 2021 Carl John Kugler III
-
-Licensed under the Apache License, Version 2.0 (the License); you may not use 
-this file except in compliance with the License. You may obtain a copy of the 
-License at
-
-   http://www.apache.org/licenses/LICENSE-2.0 
-Unless required by applicable law or agreed to in writing, software distributed 
-under the License is distributed on an AS IS BASIS, WITHOUT WARRANTIES OR 
-CONDITIONS OF ANY KIND, either express or implied. See the License for the 
-specific language governing permissions and limitations under the License.
-*/
-/* Partially derived from:
- * crcany (https://github.com/madler/crcany)
- * License
- * This code is under the zlib license, permitting free commercial use.
- */
-
 #include "crc.h"
 
 const char m_Crc7Table[] = {0x00, 0x09, 0x12, 0x1B, 0x24, 0x2D, 0x36,
@@ -41,50 +22,6 @@ const char m_Crc7Table[] = {0x00, 0x09, 0x12, 0x1B, 0x24, 0x2D, 0x36,
 	0x4B, 0x17, 0x1E, 0x05, 0x0C, 0x33, 0x3A, 0x21, 0x28, 0x5F, 0x56, 0x4D,
 	0x44, 0x7B, 0x72, 0x69, 0x60, 0x0E, 0x07, 0x1C, 0x15, 0x2A, 0x23, 0x38,
 	0x31, 0x46, 0x4F, 0x54, 0x5D, 0x62, 0x6B, 0x70, 0x79};
-
-/* The CRC check sum is a 16-bit value and is computed as follows:
- Generator polynomial G(x) = x^16 +x^12 +x^5 +1
- M(x) = (first bit) * x^n + (second bit)* x^(n-1) +...+ (last bit) * x^0
- CRC[15...0] = Remainder [(M(x) * x^16)/G(x)]
- The first bit is the first data bit of the corresponding block. The degree n of the polynomial denotes the
- number of bits of the data block decreased by one (e.g. n = 4095 for a block length of 512 bytes). The
- generator polynomial G(x) is a standard CCITT polynomial. The code has a minimal distance d=4 and is
- used for a payload length of up to 2048 Bytes (n <= 16383).
-
- A CRC is called an n-bit CRC when its check value is n-bits.
- For a given n, multiple CRCs are possible, each with a different polynomial.
- Such a polynomial has highest degree n, and hence n + 1 terms (the polynomial has a length of n + 1).
- The remainder has length n.
- The CRC has a name of the form CRC-n-XXX.
-
- Omission of the high-order bit of the divisor polynomial:
- Since the high-order bit is always 1, and since an n-bit CRC must be defined by
- an (n + 1)-bit divisor which overflows an n-bit register,
- some writers assume that it is unnecessary to mention the divisor's high-order bit.
- Omission of the low-order bit of the divisor polynomial:
- Since the low-order bit is always 1, authors such as Philip Koopman represent polynomials
- with their high-order bit intact, but without the low-order bit (the x^0 or 1 term).
- This convention encodes the polynomial complete with its degree in one integer.
-
- https://reveng.sourceforge.io/crc-catalogue/all.htm#crc.cat.crc-16-ibm-3740
- https://github.com/madler/crcany
-
- 16-bit CRC-CCITT specification, is: (CRC-16/IBM-3740? An algorithm commonly misidentified as CRC-CCITT.)
- Width = 16 bits
- Truncated polynomial = 0x1021
- Initial value = 0xFFFF (This doesn't seem to be how it works for SD cards!)
- Input data is NOT reflected
- Output CRC is NOT reflected
- No XOR is performed on the output CRC
-
- Polynomial representations
- Normal  Reversed    Reciprocal  Reversed reciprocal
- 0x1021  0x8408      0x811       0x8810
-
- 1
- 2109876543210
- 0x1021 = 0b1000000100001 = 4129
- */
 
 static uint16_t const table_byte[] = {
     0x0000, 0x1021, 0x2042, 0x3063, 0x4084, 0x50a5, 0x60c6, 0x70e7, 0x8108, 0x9129,
@@ -332,8 +269,6 @@ static inline uint16_t swaplow(uint16_t crc) {
         ((crc & 0xff00) >> 8);
 }
 
-// This code assumes that integers are stored little-endian.
-
 __attribute__((optimize("Ofast")))
 static uint16_t crc16ibm_3740_word(uint16_t crc, void const *mem, size_t len) {
     unsigned char const *data = mem;
@@ -368,12 +303,7 @@ static uint16_t crc16ibm_3740_word(uint16_t crc, void const *mem, size_t len) {
     return crc;
 }
 
-uint16_t crc16(uint8_t const *data, int const length)
-{
-	//Calculate the CRC16 checksum for the specified data block
+uint16_t crc16(uint8_t const *data, int const length) {
 	unsigned short crc = 0;
-	//Return the calculated checksum
 	return crc16ibm_3740_word(crc, data, length);
 }
-
-/* [] END OF FILE */

@@ -1,46 +1,59 @@
-/* sd_card.h
-Copyright 2021 Carl John Kugler III
-
-Licensed under the Apache License, Version 2.0 (the License); you may not use
-this file except in compliance with the License. You may obtain a copy of the
-License at
-
-   http://www.apache.org/licenses/LICENSE-2.0
-Unless required by applicable law or agreed to in writing, software distributed
-under the License is distributed on an AS IS BASIS, WITHOUT WARRANTIES OR
-CONDITIONS OF ANY KIND, either express or implied. See the License for the
-specific language governing permissions and limitations under the License.
-*/
-
-// Note: The model used here is one FatFS per SD card.
-// Multiple partitions on a card are not supported.
-
 #pragma once
 
 #include <stddef.h>
 #include <stdint.h>
 #include <sys/types.h>
-//
-#include <hardware/pio.h>
 
 #include "hardware/gpio.h"
 #include "pico/mutex.h"
-//
+
 #include "ff.h"
-//
-#include "SDIO/rp2040_sdio.h"
+
 #include "SPI/my_spi.h"
-#include "SPI/sd_card_spi.h"
-#include "diskio.h"
 #include "sd_card_constants.h"
-#include "sd_regs.h"
-#include "util.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-typedef enum { SD_IF_NONE, SD_IF_SPI, SD_IF_SDIO } sd_if_t;
+typedef enum { SD_IF_NONE, SD_IF_SPI } sd_if_t;
+typedef int (*printer_t)(const char* format, ...);
+
+typedef uint8_t CID_t[16];
+typedef uint8_t CSD_t[16];
+
+static inline uint32_t ext_bits(size_t n_src_bytes, unsigned char const *data, int msb, int lsb) {
+    uint32_t bits = 0;
+    uint32_t size = 1 + msb - lsb;
+    for (uint32_t i = 0; i < size; i++) {
+        uint32_t position = lsb + i;
+        uint32_t byte = (n_src_bytes - 1) - (position >> 3);
+        uint32_t bit = position & 0x7;
+        uint32_t value = (data[byte] >> bit) & 1;
+        bits |= value << i;
+    }
+    return bits;
+}
+
+static inline uint32_t ext_bits16(unsigned char const *data, int msb, int lsb) {
+    return ext_bits(16, data, msb, lsb);
+}
+
+static inline uint32_t CSD_sectors(CSD_t csd) /*  const  */ {
+    uint32_t c_size;
+    uint8_t ver = ext_bits16(csd, 127, 126);
+    if (ver == 0) {
+        c_size = ext_bits16(csd, 73, 62);
+        uint8_t c_size_mult = ext_bits16(csd, 49, 47);
+        uint32_t mult = 1UL << (c_size_mult + 2);
+        return (c_size + 1) * mult;
+    } else if (ver == 1) {
+        c_size = ext_bits16(csd, 69, 48);
+        return (c_size + 1) * 1024; // sectors
+    } else {
+        return 0;
+    }
+}
 
 typedef struct sd_spi_if_state_t {
     bool ongoing_mlt_blk_wrt;
@@ -50,47 +63,11 @@ typedef struct sd_spi_if_state_t {
 
 typedef struct sd_spi_if_t {
     spi_t *spi;
-    // Slave select is here instead of in spi_t because multiple SDs can share an SPI.
-    uint ss_gpio;  // Slave select for this SD card
-    // Drive strength levels for GPIO outputs:
-    // GPIO_DRIVE_STRENGTH_2MA
-    // GPIO_DRIVE_STRENGTH_4MA
-    // GPIO_DRIVE_STRENGTH_8MA
-    // GPIO_DRIVE_STRENGTH_12MA
+    uint ss_gpio;
     bool set_drive_strength;
     enum gpio_drive_strength ss_gpio_drive_strength;
     sd_spi_if_state_t state;
 } sd_spi_if_t;
-
-typedef struct sd_sdio_if_t {
-    // See sd_driver\SDIO\rp2040_sdio.pio for SDIO_CLK_PIN_D0_OFFSET
-    uint CLK_gpio;  // Must be (D0_gpio + SDIO_CLK_PIN_D0_OFFSET) % 32
-    uint CMD_gpio;
-    uint D0_gpio;      // D0
-    uint D1_gpio;      // Must be D0 + 1
-    uint D2_gpio;      // Must be D0 + 2
-    uint D3_gpio;      // Must be D0 + 3
-    PIO SDIO_PIO;      // either pio0 or pio1
-    uint DMA_IRQ_num;  // DMA_IRQ_0 or DMA_IRQ_1
-    bool use_exclusive_DMA_IRQ_handler;
-    uint baud_rate;
-    // Drive strength levels for GPIO outputs:
-    // GPIO_DRIVE_STRENGTH_2MA
-    // GPIO_DRIVE_STRENGTH_4MA
-    // GPIO_DRIVE_STRENGTH_8MA
-    // GPIO_DRIVE_STRENGTH_12MA
-    bool set_drive_strength;
-    enum gpio_drive_strength CLK_gpio_drive_strength;
-    enum gpio_drive_strength CMD_gpio_drive_strength;
-    enum gpio_drive_strength D0_gpio_drive_strength;
-    enum gpio_drive_strength D1_gpio_drive_strength;
-    enum gpio_drive_strength D2_gpio_drive_strength;
-    enum gpio_drive_strength D3_gpio_drive_strength;
-
-    /* The following fields are not part of the configuration.
-    They are state variables, and are dynamically assigned. */
-    sd_sdio_if_state_t state;
-} sd_sdio_if_t;
 
 typedef struct sd_card_state_t {
     DSTATUS m_Status;       // Card status
@@ -102,30 +79,20 @@ typedef struct sd_card_state_t {
     mutex_t mutex;
     FATFS fatfs;
     bool mounted;
-#if FF_STR_VOLUME_ID
-    char drive_prefix[32];
-#else
     char drive_prefix[4];
-#endif
 } sd_card_state_t;
 
 typedef struct sd_card_t sd_card_t;
 
-// "Class" representing SD Cards
 struct sd_card_t {
-    sd_if_t type;  // Interface type
-    union {
-        sd_spi_if_t *spi_if_p;
-        sd_sdio_if_t *sdio_if_p;
-    };
+    sd_if_t type; 
+    sd_spi_if_t *spi_if_p;
     bool use_card_detect;
     uint card_detect_gpio;    // Card detect; ignored if !use_card_detect
     uint card_detected_true;  // Varies with card socket; ignored if !use_card_detect
     bool card_detect_use_pull;
     bool card_detect_pull_hi;
 
-    /* The following fields are state variables and not part of the configuration.
-    They are dynamically assigned. */
     sd_card_state_t state;
 
     DSTATUS (*init)(sd_card_t *sd_card_p);
@@ -137,8 +104,6 @@ struct sd_card_t {
     block_dev_err_t (*sync)(sd_card_t *sd_card_p);
     uint32_t (*get_num_sectors)(sd_card_t *sd_card_p);
 
-    // Useful when use_card_detect is false - call periodically to check for presence of SD card
-    // Returns true if and only if SD card was sensed on the bus
     bool (*sd_test_com)(sd_card_t *sd_card_p);
 };
 
@@ -153,11 +118,8 @@ void csdDmp(sd_card_t *sd_card_p, printer_t printer);
 bool sd_allocation_unit(sd_card_t *sd_card_p, size_t *au_size_bytes_p);
 sd_card_t *sd_get_by_drive_prefix(const char *const name);
 
-// sd_init_driver() must be called before this:
 char const *sd_get_drive_prefix(sd_card_t *sd_card_p);
 
 #ifdef __cplusplus
 }
 #endif
-
-/* [] END OF FILE */

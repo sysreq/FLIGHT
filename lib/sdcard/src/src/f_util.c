@@ -65,12 +65,7 @@ const char *FRESULT_str(FRESULT i) {
     }
 }
 
-FRESULT delete_node (
-    TCHAR* path,    /* Path name buffer with the sub-directory to delete */
-    UINT sz_buff,   /* Size of path name buffer (items) */
-    FILINFO* fno    /* Name read buffer */
-)
-{
+FRESULT delete_node (TCHAR* path, UINT sz_buff, FILINFO* fno) {
     UINT i, j;
     FRESULT fr;
     DIR dir;
@@ -130,14 +125,11 @@ void ls(const char *dir) {
         printf("f_findfirst error: %s (%d)\n", FRESULT_str(fr), fr);
         return;
     }
-    while (fr == FR_OK && fno.fname[0]) { /* Repeat while an item is found */
-        /* Create a string that includes the file name, the file size and the
-         attributes string. */
+    while (fr == FR_OK && fno.fname[0]) {
         const char *pcWritableFile = "writable file",
                    *pcReadOnlyFile = "read only file",
                    *pcDirectory = "directory";
         const char *pcAttrib;
-        /* Point pcAttrib to a string that describes the file. */
         if (fno.fattrib & AM_DIR) {
             pcAttrib = pcDirectory;
         } else if (fno.fattrib & AM_RDO) {
@@ -145,11 +137,9 @@ void ls(const char *dir) {
         } else {
             pcAttrib = pcWritableFile;
         }
-        /* Create a string that includes the file name, the file size and the
-         attributes string. */
         printf("%s [%s] [size=%llu]\n", fno.fname, pcAttrib, fno.fsize);
 
-        fr = f_findnext(&dj, &fno); /* Search for next item */
+        fr = f_findnext(&dj, &fno);
     }
     f_closedir(&dj);
 }

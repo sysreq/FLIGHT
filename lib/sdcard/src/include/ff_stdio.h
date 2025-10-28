@@ -1,25 +1,11 @@
-/* ff_stdio.h
-Copyright 2021 Carl John Kugler III
+#pragma once
 
-Licensed under the Apache License, Version 2.0 (the License); you may not use 
-this file except in compliance with the License. You may obtain a copy of the 
-License at
-
-   http://www.apache.org/licenses/LICENSE-2.0 
-Unless required by applicable law or agreed to in writing, software distributed 
-under the License is distributed on an AS IS BASIS, WITHOUT WARRANTIES OR 
-CONDITIONS OF ANY KIND, either express or implied. See the License for the 
-specific language governing permissions and limitations under the License.
-*/
-// For compatibility with FreeRTOS+FAT API
 #include <errno.h>
 #include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
-//
+
 #include "ff.h"
-//
-#include "my_debug.h"
 
 #define BaseType_t int
 #define FF_FILE FIL
@@ -41,9 +27,7 @@ specific language governing permissions and limitations under the License.
 #define ff_feof f_eof
 
 typedef struct FF_STAT {
-    uint32_t st_size; /* Size of the object in number of bytes. */
-    // uint16_t st_mode;			/* The mode (attribute bits) of this
-    // file or directory. */
+    uint32_t st_size;
 } FF_Stat_t;
 
 typedef struct {
@@ -51,7 +35,6 @@ typedef struct {
     FILINFO fileinfo;    
     const char *pcFileName;
     uint32_t ulFileSize;
-    //uint8_t ucAttributes;
 } FF_FindData_t;
 
 FF_FILE *ff_fopen(const char *pcFile, const char *pcMode);

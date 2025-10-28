@@ -1,25 +1,9 @@
-/* sd_card_constants.h
-Copyright 2021 Carl John Kugler III
-
-Licensed under the Apache License, Version 2.0 (the License); you may not use
-this file except in compliance with the License. You may obtain a copy of the
-License at
-
-   http://www.apache.org/licenses/LICENSE-2.0
-Unless required by applicable law or agreed to in writing, software distributed
-under the License is distributed on an AS IS BASIS, WITHOUT WARRANTIES OR
-CONDITIONS OF ANY KIND, either express or implied. See the License for the
-specific language governing permissions and limitations under the License.
-*/
-
 #pragma once
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-/*!< Block size supported for SD card is 512 bytes */
-// Only HC block size is supported.
 static const size_t sd_block_size = 512;
 
 typedef enum {
@@ -37,7 +21,6 @@ typedef enum {
     SD_BLOCK_DEVICE_ERROR_WRITE = 1 << 10           /*!< Write error: !SPI_DATA_ACCEPTED */
 } block_dev_err_t;
 
-/** Represents the different SD/MMC card types  */
 typedef enum {
     SDCARD_NONE = 0, /**< No card is present */
     SDCARD_V1 = 1,   /**< v1.x Standard Capacity */
@@ -46,9 +29,6 @@ typedef enum {
     CARD_UNKNOWN = 4 /**< Unknown or unsupported card */
 } card_type_t;
 
-/* On the wire, convert to hex and add 0x40 for transmitter bit.
-e.g.: CMD17_READ_SINGLE_BLOCK: 17 = 0x11; 0x11 | 0x40 = 0x51 */
-// Supported SD Card Commands
 typedef enum {                          /* Number on wire in parens */
     CMD_NOT_SUPPORTED = -1,             /* Command not supported error */
     CMD0_GO_IDLE_STATE = 0,             /* Resets the SD Memory Card */
@@ -64,22 +44,18 @@ typedef enum {                          /* Number on wire in parens */
     CMD13_SEND_STATUS = 13,             /* (0x4D) Card responds with status */
     CMD16_SET_BLOCKLEN = 16,            /* Length for SC card is set */
     CMD17_READ_SINGLE_BLOCK = 17,       /* (0x51) Read single block of data */
-    CMD18_READ_MULTIPLE_BLOCK = 18,     /* (0x52) Continuously Card transfers data blocks to host
-         until interrupted by a STOP_TRANSMISSION command */
+    CMD18_READ_MULTIPLE_BLOCK = 18,     
     CMD24_WRITE_BLOCK = 24,             /* (0x58) Write single block of data */
-    CMD25_WRITE_MULTIPLE_BLOCK = 25,    /* (0x59) Continuously writes blocks of data
-        until    'Stop Tran' token is sent */
+    CMD25_WRITE_MULTIPLE_BLOCK = 25,
     CMD27_PROGRAM_CSD = 27,             /* Programming bits of CSD */
-    CMD32_ERASE_WR_BLK_START_ADDR = 32, /* Sets the address of the first write
-     block to be erased. */
-    CMD33_ERASE_WR_BLK_END_ADDR = 33,   /* Sets the address of the last write
-       block of the continuous range to be erased.*/
+    CMD32_ERASE_WR_BLK_START_ADDR = 32, 
+    CMD33_ERASE_WR_BLK_END_ADDR = 33,  
     CMD38_ERASE = 38,                   /* Erases all previously selected write blocks */
     CMD55_APP_CMD = 55,                 /* Extend to Applications specific commands */
     CMD56_GEN_CMD = 56,                 /* General Purpose Command */
     CMD58_READ_OCR = 58,                /* Read OCR register of card */
     CMD59_CRC_ON_OFF = 59,              /* Turns the CRC option on or off*/
-    // App Commands
+   
     ACMD6_SET_BUS_WIDTH = 6,
     ACMD13_SD_STATUS = 13,
     ACMD22_SEND_NUM_WR_BLOCKS = 22,
@@ -88,15 +64,6 @@ typedef enum {                          /* Number on wire in parens */
     ACMD42_SET_CLR_CARD_DETECT = 42,
     ACMD51_SEND_SCR = 51,
 } cmdSupported;
-//------------------------------------------------------------------------------
-
-///* Disk Status Bits (DSTATUS) */
-// See diskio.h.
-// enum {
-//    STA_NOINIT = 0x01, /* Drive not initialized */
-//    STA_NODISK = 0x02, /* No medium in the drive */
-//    STA_PROTECT = 0x04 /* Write protected */
-//};
 
 #ifdef __cplusplus
 }
