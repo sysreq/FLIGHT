@@ -11,7 +11,6 @@ target_sources(sdcard INTERFACE
     ${CMAKE_CURRENT_LIST_DIR}/src/ff15/source/ff.c
     
     # SD driver core
-    ${CMAKE_CURRENT_LIST_DIR}/src/sd_driver/dma_interrupts.c
     ${CMAKE_CURRENT_LIST_DIR}/src/sd_driver/sd_card.c
         
     # SPI driver

@@ -7,7 +7,7 @@
 
 #include "sdcard.h"
 
-const char* build_timestamp = "011 @ " __DATE__ " " __TIME__;
+const char* build_timestamp = "012 @ " __DATE__ " " __TIME__;
 
 int main() {
     stdio_init_all();

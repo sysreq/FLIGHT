@@ -16,10 +16,6 @@
 
 #include "my_spi.h"
 
-#ifndef USE_DBG_PRINTF
-#pragma GCC diagnostic ignored "-Wunused-variable"
-#endif
-
 static bool chk_spi(spi_t *spi_p) {
     uint32_t sr = spi_get_const_hw(spi_p->hw_inst)->sr;
     const uint32_t bad_bits = SPI_SSPSR_BSY_BITS | SPI_SSPSR_RFF_BITS | SPI_SSPSR_RNE_BITS;

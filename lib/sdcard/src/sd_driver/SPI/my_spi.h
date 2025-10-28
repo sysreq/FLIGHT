@@ -7,7 +7,7 @@
 #include "pico/stdlib.h"
 #include "pico/mutex.h"
 #include "pico/types.h"
-//
+
 #include "hardware/dma.h"
 #include "hardware/gpio.h"
 #include "hardware/irq.h"
@@ -54,11 +54,6 @@ static inline void spi_lock(spi_t *spi_p) {
 static inline void spi_unlock(spi_t *spi_p) {
     mutex_exit(&spi_p->mutex);
 }
-
-#  define LED_ON()
-#  define LED_OFF()
-#  define LED_INIT()
-
 
 #ifdef __cplusplus
 }
