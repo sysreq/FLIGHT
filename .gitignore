@@ -1,2 +1,4 @@
 build/
 .claude/
+lib/sdcard/src.zip
+lib/sdcard/src.*.zip
