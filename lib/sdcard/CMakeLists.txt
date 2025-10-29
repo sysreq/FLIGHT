@@ -17,6 +17,7 @@ target_sources(sdcard INTERFACE
     ${CMAKE_CURRENT_LIST_DIR}/src/sd_driver/SPI/my_spi.c
     ${CMAKE_CURRENT_LIST_DIR}/src/sd_driver/SPI/sd_card_spi.c
     ${CMAKE_CURRENT_LIST_DIR}/src/sd_driver/SPI/sd_spi.c
+    ${CMAKE_CURRENT_LIST_DIR}/src/sd_driver/SPI/spi_driver.cpp
     
     # Utility sources
     ${CMAKE_CURRENT_LIST_DIR}/src/src/crc.c

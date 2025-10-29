@@ -7,6 +7,8 @@
 
 #include "sdcard.h"
 
+#include "lib\sdcard\src\sd_driver\SPI\spi_driver.h"
+
 const char* build_timestamp = "012 @ " __DATE__ " " __TIME__;
 
 int main() {
