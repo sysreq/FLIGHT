@@ -38,6 +38,9 @@
     "raspberry-pi-pico.cmakePath": "${env:USERPROFILE}/.pico-sdk/cmake/v4.1.2/bin/cmake",
     "raspberry-pi-pico.ninjaPath": "ninja",
     "files.associations": {
-        "atomic": "cpp"
+        "atomic": "cpp",
+        "*.settings": "cpp",
+        "algorithm": "cpp",
+        "cstddef": "cpp"
     }
 }
