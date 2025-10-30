@@ -252,33 +252,6 @@ bool is_tx_ready();
 uint8_t get_my_source_id();
 
 /**
- * @brief Get RX statistics about message processing
- * 
- * @param total_bytes_rx Total bytes received
- * @param total_messages_rx Total valid messages received
- * @param messages_queued Number of messages currently in RX queue
- * @param pool_allocated Number of pool allocations currently in use
- * @param crc_errors Number of messages with CRC errors
- * @param framing_errors Number of framing errors detected
- */
-void get_stats(uint32_t& total_bytes_rx, uint32_t& total_messages_rx, 
-               uint32_t& messages_queued, uint32_t& pool_allocated,
-               uint32_t& crc_errors, uint32_t& framing_errors);
-
-/**
- * @brief Get TX statistics about message queuing and transmission
- * 
- * @param total_queued Total messages queued for transmission
- * @param total_sent Total messages successfully transmitted
- * @param queue_full_drops Number of messages dropped due to full queue
- * @param current_queue_depth Current number of messages in TX queue
- * @param peak_queue_depth Peak TX queue depth since initialization
- */
-void get_tx_stats(uint32_t& total_queued, uint32_t& total_sent,
-                  uint32_t& queue_full_drops, uint32_t& current_queue_depth,
-                  uint32_t& peak_queue_depth);
-
-/**
  * @brief Get current number of messages in TX queue
  * 
  * @return Number of messages waiting to be transmitted

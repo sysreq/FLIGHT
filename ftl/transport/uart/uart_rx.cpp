@@ -44,11 +44,6 @@ uint8_t g_expected_length = 0;
 uint8_t g_bytes_received = 0;
 uint16_t g_received_crc = 0;
 
-uint32_t g_total_bytes_received = 0;
-uint32_t g_total_messages_received = 0;
-uint32_t g_crc_errors = 0;
-uint32_t g_framing_errors = 0;
-
 uint8_t* get_rx_buffer_ptr() {
     if (g_current_rx_handle == MessagePoolType::INVALID) {
         return nullptr;
@@ -79,7 +74,6 @@ bool validate_and_enqueue_message() {
     
     if (calculated_crc != g_received_crc) {
         printf("CRC error: expected 0x%04X, got 0x%04X", calculated_crc, g_received_crc);
-        g_crc_errors++;
         reset_state();
         return false;
     }
@@ -99,13 +93,10 @@ bool validate_and_enqueue_message() {
             return false;
         }
     }
-    
-    g_total_messages_received++;
-    
+        
     g_current_rx_handle = MessagePoolType::INVALID;
     g_rx_state = State::WAIT_START_1;
     g_expected_length = 0;
-    g_bytes_received = 0;
     g_received_crc = 0;
     
     return true;
@@ -138,7 +129,6 @@ void process_byte(uint8_t byte) {
         case State::READ_LENGTH:
             if (byte == 0 || byte > ftl_config::MAX_PAYLOAD_SIZE) {
                 printf("Invalid length: %d", byte);
-                g_framing_errors++;
                 reset_state();
             } else {
                 g_expected_length = byte;
@@ -196,7 +186,6 @@ void process_byte(uint8_t byte) {
                 g_rx_state = State::WAIT_END_2;
             } else {
                 printf("Expected 0xDE, got 0x%02X", byte);
-                g_framing_errors++;
                 reset_state();
             }
             break;
@@ -206,7 +195,6 @@ void process_byte(uint8_t byte) {
                 validate_and_enqueue_message();
             } else {
                 printf("Expected 0xFA, got 0x%02X", byte);
-                g_framing_errors++;
                 reset_state();
             }
             break;
@@ -223,8 +211,6 @@ void process_data(ftl_internal::DmaController& dma_controller) {
         return;
     }
     
-    g_total_bytes_received += bytes_read;
-    
     for (size_t i = 0; i < bytes_read; i++) {
         process_byte(read_buffer[i]);
     }
@@ -235,10 +221,6 @@ void process_data(ftl_internal::DmaController& dma_controller) {
 void initialize() {
     reset_state();
     g_handle_queue.clear();
-    g_total_bytes_received = 0;
-    g_total_messages_received = 0;
-    g_crc_errors = 0;
-    g_framing_errors = 0;
 }
 
 void process(ftl_internal::DmaController& dma_controller) {
@@ -261,15 +243,6 @@ MessageHandle get_message() {
     
     MsgHandle<MessagePoolType> msg_handle(messages::g_message_pool, handle);
     return MessageHandle(std::move(msg_handle));
-}
-
-Statistics get_statistics() {
-    return Statistics{
-        g_total_bytes_received,
-        g_total_messages_received,
-        g_crc_errors,
-        g_framing_errors
-    };
 }
 
 uint32_t get_pool_allocated_count() {

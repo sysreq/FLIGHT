@@ -109,43 +109,4 @@ bool is_tx_ready() {
 uint8_t get_my_source_id() {
     return g_source_id;
 }
-
-void get_stats(uint32_t& total_bytes_rx, uint32_t& total_messages_rx, 
-               uint32_t& messages_queued, uint32_t& pool_allocated,
-               uint32_t& crc_errors, uint32_t& framing_errors) {
-    auto stats = ftl::uart::get_rx_statistics();
-    
-    total_bytes_rx = stats.total_bytes_received;
-    total_messages_rx = stats.total_messages_received;
-    crc_errors = stats.crc_errors;
-    framing_errors = stats.framing_errors;
-    
-    // Note: messages_queued and pool_allocated are internal implementation
-    // details not exposed by the refactored UART public API
-    messages_queued = 0;
-    pool_allocated = 0;
-}
-
-void get_tx_stats(uint32_t& total_queued, uint32_t& total_sent,
-                  uint32_t& queue_full_drops, uint32_t& current_queue_depth,
-                  uint32_t& peak_queue_depth) {
-    auto stats = ftl::uart::get_tx_statistics();
-    
-    total_queued = stats.total_messages_queued;
-    total_sent = stats.total_messages_sent;
-    queue_full_drops = stats.queue_full_drops;
-    current_queue_depth = stats.current_queue_depth;
-    peak_queue_depth = stats.peak_queue_depth;
-}
-
-uint32_t get_tx_queue_count() {
-    auto stats = ftl::uart::get_tx_statistics();
-    return stats.current_queue_depth;
-}
-
-bool is_tx_queue_empty() {
-    auto stats = ftl::uart::get_tx_statistics();
-    return stats.current_queue_depth == 0;
-}
-
 } // namespace ftl

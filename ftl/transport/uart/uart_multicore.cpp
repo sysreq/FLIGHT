@@ -14,12 +14,6 @@ namespace internal_multicore {
 
 namespace {
 
-// Statistics
-uint32_t g_core1_sent = 0;
-uint32_t g_core1_fifo_drops = 0;
-uint32_t g_core0_received = 0;
-uint32_t g_core0_tx_queue_drops = 0;
-
 bool g_is_initialized = false;
 
 /**
@@ -49,14 +43,7 @@ void initialize() {
     if (g_is_initialized) {
         return;
     }
-    
-    // Nothing special needed - Pico SDK initializes FIFO automatically
-    // Just clear statistics
-    g_core1_sent = 0;
-    g_core1_fifo_drops = 0;
-    g_core0_received = 0;
-    g_core0_tx_queue_drops = 0;
-    
+        
     g_is_initialized = true;
     
     printf("Multicore TX initialized\n");
@@ -76,10 +63,8 @@ bool send_from_core1(PoolHandle handle, uint8_t length) {
     
     if (multicore_fifo_wready()) {
         multicore_fifo_push_blocking(word); 
-        g_core1_sent++;
         return true;
     } else {
-        g_core1_fifo_drops++;
         return false;
     }
 }
@@ -104,22 +89,11 @@ void process_fifo_messages() {
         }
         
         if (internal_tx::enqueue_message_on_core0(handle)) {
-            g_core0_received++;
         } else {
             messages::g_message_pool.release(handle);
-            g_core0_tx_queue_drops++;
             printf("Multicore: Core 0 TX queue full, dropping message\n");
         }
     }
-}
-
-Statistics get_statistics() {
-    return Statistics{
-        g_core1_sent,
-        g_core1_fifo_drops,
-        g_core0_received,
-        g_core0_tx_queue_drops
-    };
 }
 
 bool is_core1_ready() {

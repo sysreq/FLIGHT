@@ -12,29 +12,6 @@ namespace ftl {
 class MessageHandle;
 
 namespace uart {
-
-struct TxStatistics {
-    uint32_t total_messages_queued;
-    uint32_t total_messages_sent;
-    uint32_t queue_full_drops;
-    uint32_t current_queue_depth;
-    uint32_t peak_queue_depth;
-};
-
-struct RxStatistics {
-    uint32_t total_bytes_received;
-    uint32_t total_messages_received;
-    uint32_t crc_errors;
-    uint32_t framing_errors;
-};
-
-struct MulticoreStatistics {
-    uint32_t core1_messages_sent;      // Messages sent from Core 1
-    uint32_t core1_fifo_full_drops;    // Drops due to FIFO full
-    uint32_t core0_messages_received;  // Messages processed on Core 0
-    uint32_t core0_tx_queue_drops;     // Drops due to Core 0 TX queue full
-};
-
 /**
  * @brief Initialize the UART transport layer
  * 
@@ -107,9 +84,5 @@ MessageHandle get_message();
 
 bool is_tx_ready();
 bool is_core1_tx_ready();
-TxStatistics get_tx_statistics();
-RxStatistics get_rx_statistics();
-MulticoreStatistics get_multicore_statistics();
-
 } // namespace uart
 } // namespace ftl

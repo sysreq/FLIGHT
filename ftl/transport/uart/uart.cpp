@@ -49,18 +49,9 @@ void poll() {
         return;
     }
 
-    // 1. Process RX DMA buffers
     g_dma_controller.process_rx_dma();
-    
-    // 2. Feed new bytes into the RX state machine
     internal_rx::process(g_dma_controller);
-    
-    // 3. Process Core 1 -> Core 0 FIFO messages
-    //    This directly enqueues handles to the TX queue
     internal_multicore::process_fifo_messages();
-    
-    // 4. Process Core 0 TX queue
-    //    This dequeues handles and starts DMA transfers
     internal_tx::process_tx_queue(g_dma_controller);
 }
 
@@ -79,14 +70,9 @@ bool send_message(std::span<const uint8_t> payload) {
     }
 
     if (get_core_num() == g_init_core) {
-        // --- Core 0 Path ---
-        // Directly enqueue the handle to the TX queue
         return internal_tx::enqueue_message_on_core0(handle);
     } else {
-        // --- Core 1 Path ---
-        // Send the handle via the FIFO
-        bool success = internal_multicore::send_from_core1(handle, 
-                                                           static_cast<uint8_t>(payload.size()));
+        bool success = internal_multicore::send_from_core1(handle, static_cast<uint8_t>(payload.size()));
         if (!success) {
             ftl::messages::g_message_pool.release(handle);
         }
@@ -128,49 +114,5 @@ bool is_core1_tx_ready() {
     }
     return internal_multicore::is_core1_ready();
 }
-
-TxStatistics get_tx_statistics() {
-    if (!g_is_initialized) {
-        return TxStatistics{};
-    }
-    
-    auto internal_stats = internal_tx::get_statistics();
-    return TxStatistics{
-        internal_stats.total_messages_queued,
-        internal_stats.total_messages_sent,
-        internal_stats.queue_full_drops,
-        internal_stats.current_queue_depth,
-        internal_stats.peak_queue_depth
-    };
-}
-
-RxStatistics get_rx_statistics() {
-    if (!g_is_initialized) {
-        return RxStatistics{};
-    }
-    
-    auto internal_stats = internal_rx::get_statistics();
-    return RxStatistics{
-        internal_stats.total_bytes_received,
-        internal_stats.total_messages_received,
-        internal_stats.crc_errors,
-        internal_stats.framing_errors
-    };
-}
-
-MulticoreStatistics get_multicore_statistics() {
-    if (!g_is_initialized) {
-        return MulticoreStatistics{};
-    }
-    
-    auto internal_stats = internal_multicore::get_statistics();
-    return MulticoreStatistics{
-        internal_stats.core1_messages_sent,
-        internal_stats.core1_fifo_full_drops,
-        internal_stats.core0_messages_received,
-        internal_stats.core0_tx_queue_drops
-    };
-}
-
 } // namespace uart
 } // namespace ftl
